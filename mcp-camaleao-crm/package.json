@@ -1,0 +1,25 @@
+{
+  "name": "@camaleao/mcp-crm",
+  "version": "1.0.0",
+  "description": "MCP Server Camaleão CRM - Integração com API GraphQL do CRM",
+  "main": "build/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "start": "node build/index.js",
+    "watch": "tsx watch src/index.ts"
+  },
+  "keywords": ["mcp", "camaleao", "crm"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "node-fetch": "^3.3.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

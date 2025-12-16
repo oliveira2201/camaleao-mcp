@@ -1,0 +1,21 @@
+node_modules/
+npm-debug.log
+.env
+.DS_Store
+*.log
+build/
+dist/
+.vscode/
+.idea/
+coverage/
+.nyc_output/
+*.swp
+*.swo
+*~
+.cache/
+temp/
+tmp/
+
+# Manter apenas os sources
+!mcp-gateway/
+!mcp-camaleao-crm/
