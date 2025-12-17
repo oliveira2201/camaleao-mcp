@@ -164,17 +164,14 @@ async function executarConsulta(
   const totalPago = pagamentos.reduce((s, e) => s + e.value, 0);
   const saldo = totalRecebido + totalPago;
 
-  // Formatar mensagem
-  let msg = `📊 Recebimentos de ${periodoLabel}:\n\n`;
+  // Formatar mensagem - APENAS recebimentos por padrão
+  let msg = `💰 Recebimentos de ${periodoLabel}:\n\n`;
   for (const item of resumo) {
-    msg += `${item.via} - R$ ${formatarDinheiro(item.total)}\n`;
+    msg += `${item.via} R$ ${formatarDinheiro(item.total)}\n`;
   }
-  msg += `\nTotal = R$ ${formatarDinheiro(totalRecebido)}`;
+  msg += `\n✅ TOTAL R$ ${formatarDinheiro(totalRecebido)}`;
 
-  if (totalPago < 0) {
-    msg += `\n\n💸 Pagamentos: R$ ${formatarDinheiro(Math.abs(totalPago))}`;
-    msg += `\n💰 Saldo líquido: R$ ${formatarDinheiro(saldo)}`;
-  }
+  // Pagamentos e saldo disponíveis no JSON, mas não na mensagem principal
 
   return {
     data_inicio: dataInicio,

@@ -41,7 +41,13 @@
       "Bash(git branch:*)",
       "Bash(git push:*)",
       "Bash(taskkill:*)",
-      "Bash(netstat:*)"
+      "Bash(netstat:*)",
+      "Bash(Cora - R$ 450,00)",
+      "Bash(Total = R$ 450,00)",
+      "Bash(💸 Pagamentos: R$ 210,00)",
+      "Bash(💰 Saldo líquido: R$ 240,00\"\n\nDEPOIS:\n\"💰 Recebimentos de hoje:)",
+      "Bash(Cora R$ 450,00)",
+      "Bash(✅ TOTAL R$ 450,00\"\n\n🦎 Generated with Claude Code\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n)\")"
     ]
   }
 }
