@@ -1,0 +1,463 @@
+{
+  "name": "Fred | Barão da Navalha",
+  "nodes": [
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "51bd4896-17e9-484b-b08a-b6854225ccb3",
+              "name": "response",
+              "value": "={{ $json.output }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1040,
+        160
+      ],
+      "id": "881af23b-5c24-4ba5-8160-febe450a71dd",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('setarInfo3').item.json.identificadorLead }}",
+        "contextWindowLength": 40
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "typeVersion": 1.3,
+      "position": [
+        320,
+        480
+      ],
+      "id": "90d2617c-d237-49fb-9929-63821d86ce31",
+      "name": "Postgres Chat Memory",
+      "credentials": {
+        "postgres": {
+          "id": "6ZyqYAF7tGQrMHBP",
+          "name": "Postgres | Tabela teste"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4.1-mini"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        144,
+        480
+      ],
+      "id": "245f48ee-02e9-4357-94b7-c0f4d2f14d21",
+      "name": "OpenAI Chat Model2",
+      "credentials": {
+        "openAiApi": {
+          "id": "LddDKTuP5h0yVWPU",
+          "name": "OpenAI | Afonso"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "",
+        "height": 600,
+        "width": 1580,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -192,
+        64
+      ],
+      "typeVersion": 1,
+      "id": "4fbb1361-9194-4cbc-b8ae-09a9623a27c2",
+      "name": "Sticky Note5"
+    },
+    {
+      "parameters": {
+        "content": "## Agenda",
+        "height": 240,
+        "width": 720
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        624,
+        400
+      ],
+      "typeVersion": 1,
+      "id": "55a1afa2-c3a3-48ed-a720-f30ba1153b88",
+      "name": "Sticky Note12"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3058e999-b1bf-43f3-b95c-bf1d71157c51",
+              "name": "Duvida",
+              "value": "={{ $('When Executed by Another Workflow').item.json.duvida }}",
+              "type": "string"
+            },
+            {
+              "id": "c6e2e733-5bb4-4b3d-9a79-cf43a9e56458",
+              "name": "identificadorLead",
+              "value": "={{ $('When Executed by Another Workflow').item.json['Identificador Lead'] }}",
+              "type": "string"
+            },
+            {
+              "id": "9181a250-f2ad-402e-8bed-2bc4ec9720e6",
+              "name": "servico",
+              "value": "=Serviço: {{ $('When Executed by Another Workflow').item.json.servico }}",
+              "type": "string"
+            },
+            {
+              "id": "2986dc61-de65-440b-846c-d36b4d60d75b",
+              "name": "resultado",
+              "value": "={{ $json.resultado }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        384,
+        160
+      ],
+      "id": "f0e8e61d-b044-4f81-8e2f-b04ba89cbcfb",
+      "name": "setarInfo3"
+    },
+    {
+      "parameters": {
+        "name": "criar_reuniao",
+        "description": "=**Quando usar:**  \n- Sempre que precisar **marcar um agendamento** na agenda.  \n- Antes de chamar essa tool, é obrigatório ter:\n  1. O **nome completo** do paciente.\n  2. A **data e hora** desejada.\n  3. Serviço que o lead tem interesse.\n\n**Quando não usar:**  \n- Se ainda não tiver o nome completo do paciente.  \n- Se ainda não tiver a data e o horário desejado.\n- Se ainda não tiver o serviço desejado.\n\n#### Regras para marcar o agendamento\nPara marcar qualquer agendamento utilizando a tool **`criar_reuniao`**, é obrigatório definir corretamente:  \n1. O **start** (início do agendamento).  \n2. O **end** (fim do agendamento).  \n\nO tempo de cada consulta é de **30 minutos** (end = start + 30min)  \n\nSempre calcule o horário final (**end**) com base na duração correspondente ao serviço informado. ",
+        "workflowId": {
+          "__rl": true,
+          "value": "z53DHNWKW5ku8LvP",
+          "mode": "id",
+          "cachedResultUrl": "/workflow/z53DHNWKW5ku8LvP"
+        },
+        "fields": {
+          "values": [
+            {
+              "name": "Evento",
+              "stringValue": "agendamento"
+            },
+            {
+              "name": "Remotejid",
+              "stringValue": "={{ $('setarInfo3').item.json.identificadorLead }}"
+            },
+            {
+              "name": "servico",
+              "stringValue": "={{ $('setarInfo3').item.json.servico }}"
+            },
+            {
+              "name": "Profissional",
+              "stringValue": "Fred"
+            }
+          ]
+        },
+        "specifyInputSchema": true,
+        "jsonSchemaExample": "{\n    \"lead\": \"nome completo do lead\",\n    \"start\": \"data e hora do inicio da reunião\",\n    \"end\": \"data e hora do fim da reunião\"\n}"
+      },
+      "id": "9269120a-1c06-404d-a54c-bc0b640ac7c0",
+      "name": "criar_reuniao",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        720,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "name": "reagendar_reuniao",
+        "description": "=**Quando usar:**  \n- Use quando o lead solicitar a **mudança de data ou horário** de um agendamento já marcado.\n- Consulte seu **histórico de conversa com o lead** para puxar o nome e o agendamento anterior.\n\n**Regras para uso:**  \n- Você já tem acesso ao histórico de conversas e agendamentos anteriores, então **não precisa pedir novamente** o nome e o horário anterior.\n\n**Quando não usar:**  \n- Se o paciente não tiver um agendamento previamente agendado.",
+        "workflowId": {
+          "__rl": true,
+          "value": "z53DHNWKW5ku8LvP",
+          "mode": "id",
+          "cachedResultUrl": "/workflow/z53DHNWKW5ku8LvP"
+        },
+        "fields": {
+          "values": [
+            {
+              "name": "Evento",
+              "stringValue": "reagendamento"
+            },
+            {
+              "name": "Remotejid",
+              "stringValue": "={{ $('setarInfo3').item.json.identificadorLead }}"
+            }
+          ]
+        },
+        "specifyInputSchema": true,
+        "jsonSchemaExample": "{\n    \"lead\": \"nome do lead\",\n    \"start\": \"data e hora do início da reunião\",\n    \"end\": \"data e hora do fim da reunião\"\n}\n"
+      },
+      "id": "cfb78862-a052-4a44-92ca-9df463302778",
+      "name": "reagendar_reuniao",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1040,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "name": "cancelar_reuniao",
+        "description": "=**Quando usar:**  \n- Use quando o paciente solicitar o **cancelamento** de um agendamento já agendado.\n\n**Regras para uso:**  \n- Você já tem acesso ao histórico de conversas e agendamentos anteriores, então **não precisa pedir novamente** o nome ou o horário anterior.\n\n**Quando não usar:**  \n- Se não houver nenhum agendamento agendado com o lead.\n- Se a solicitação for apenas uma dúvida ou pergunta genérica sem intenção de cancelar.",
+        "workflowId": {
+          "__rl": true,
+          "value": "z53DHNWKW5ku8LvP",
+          "mode": "id",
+          "cachedResultUrl": "/workflow/z53DHNWKW5ku8LvP"
+        },
+        "fields": {
+          "values": [
+            {
+              "name": "Evento",
+              "stringValue": "cancelamento"
+            },
+            {
+              "name": "Remotejid",
+              "stringValue": "={{ $('setarInfo3').item.json.identificadorLead }}"
+            }
+          ]
+        },
+        "specifyInputSchema": true,
+        "jsonSchemaExample": "{\n    \"lead\": \"nome do lead\"\n}\n"
+      },
+      "id": "8b0f594d-b7ef-41cc-aafd-766097ea488b",
+      "name": "cancelar_reuniao",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1200,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "name": "ver_horarios",
+        "description": "=**Quando usar:**  \n- Use para buscar dias e horários disponíveis para agendamento.",
+        "workflowId": {
+          "__rl": true,
+          "value": "z53DHNWKW5ku8LvP",
+          "mode": "id",
+          "cachedResultUrl": "/workflow/z53DHNWKW5ku8LvP"
+        },
+        "fields": {
+          "values": [
+            {
+              "name": "Evento",
+              "stringValue": "VerHorarios"
+            }
+          ]
+        },
+        "jsonSchemaExample": ""
+      },
+      "id": "a1a5bca6-425d-4aeb-958f-35c472eb6340",
+      "name": "ver_horarios",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        880,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "duvida"
+            },
+            {
+              "name": "Identificador Lead"
+            },
+            {
+              "name": "servico"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -112,
+        160
+      ],
+      "id": "ecbb3c7b-6057-4115-989b-109ea866978c",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "jsCode": "const days = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];\nconst now = new Date();   // <-- ESTA LINHA ESTAVA FALTANDO\nconst pad = (n) => String(n).padStart(2, '0');\n\nlet result = '';\n\nfor (let i = 1; i <= 10; i++) {\n  const future = new Date(now);\n  future.setDate(now.getDate() + i);\n\n  let label = '';\n\n  if (i === 1) {\n    label = `Amanhã é ${days[future.getDay()]} ${pad(future.getDate())}/${pad(future.getMonth() + 1)}/${String(future.getFullYear()).slice(2)}`;\n  } else if (i === 2) {\n    label = `Depois de amanhã é ${days[future.getDay()]} ${pad(future.getDate())}/${pad(future.getMonth() + 1)}/${String(future.getFullYear()).slice(2)}`;\n  } else {\n    label = `${days[future.getDay()]} será dia ${pad(future.getDate())}/${pad(future.getMonth() + 1)}/${String(future.getFullYear()).slice(2)}`;\n  }\n\n  result += `${label}\\n`;\n}\n\nreturn [\n  {\n    json: {\n      resultado: result.trim()\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        144,
+        160
+      ],
+      "id": "7f82c6b4-fb80-4d31-bd09-86e20011ce97",
+      "name": "proximos_dias"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.Duvida }}\n\n\n{{ $json.servico }}",
+        "options": {
+          "systemMessage": "=## IDENTIDADE\nVocê é um **agente interno** responsável exclusivamente por gerenciar os **agendamentos do Fred**, profissional da barbearia masculina Barão da Navalha.\n\n## FUNÇÃO\n-   Verificar a **disponibilidade de datas e horários** para agendamentos. \n-   **Agendar, remarcar ou cancelar** atendimentos com clientes interessados.  \n-   Validar sempre os **pré-requisitos obrigatórios** antes de confirmar o agendamento: **nome completo**, data/hora desejada e **serviço escolhido**.\n\n## DIAS E HORÁRIOS DISPONÍVEIS\n\n-   O profissional Fred realiza atendimentos **de segunda a sábado, das 10h às 18h**.\n-   Cada serviço tem duração de **30 minutos**.\n    - Caso o cliente opte por 2 serviços, acrescente mais 30 minutos (por serviço). Exemplo: 2 serviços, vai ser 1 hora.\n-   Domingos e feriados não possuem atendimento disponível.\n-   Os horários devem sempre ser informados com **dia da semana, data (dia e mês) e hora**, no formato:\n    > Exemplo: “Quarta-feira, dia 18/05, às 15h”.\n\n## TOOLS DISPONÍVEIS\n\n### 1. Nome da tool: `criar_reuniao`\n\n**Quando usar:**\n-   Sempre que precisar **marcar um agendamento** na agenda do Fred.\n-   Antes de chamar essa tool, é obrigatório ter:\n    1.  **Nome completo** do cliente\n    2.  **Data e hora** desejado   \n    3.  **Serviço desejado**       \n\n**Quando não usar:**\n-   Se faltar qualquer um dos dados obrigatórios acima.\n\n### 2. Nome da tool: `reagendar_reuniao`\n\n**Quando usar:**\n-   Quando o cliente solicitar a **mudança de data ou horário** de um agendamento já marcado.\n-   Utilize as informações existentes no histórico da conversa.\n\n**Quando não usar:**\n-   Se o cliente não tiver um agendamento previamente agendado.\n\n### 3. Nome da tool: `cancelar_reuniao`\n\n**Quando usar:**\n-   Quando o cliente solicitar o **cancelamento** de um agendamento já agendado.\n\n**Quando não usar:**\n-   Se não houver agendamento marcado ou se o cliente estiver apenas com dúvida.\n\n### 4. Nome da tool: `ver_horarios`\n\n**Quando usar:**\n-   Para **consultar os dias e horários disponíveis** na agenda.\n-   Deve informar de forma clara se o horário está **disponível** ou **indisponível**.\n\n**Quando não usar:**\n-   Para confirmar ou marcar diretamente o agendamento — use apenas para consulta de disponibilidade.\n\n## REGRAS GERAIS\n-   Sempre confirmar os **pré-requisitos obrigatórios** antes de agendar: **nome completo**, **data e hora desejado** e **serviço desejado**.\n-   Cada serviço deve ter **30 minutos de duração**.\n-   Os atendimentos são realizados **de segunda a sábado, das 10h às 18h**.\n-   Sempre que mencionar um horário, informe o **dia da semana**, **data (dia e mês)** e **hora**, no formato:\n    > Exemplo: “Sexta-feira, dia 22/08, às 11h”.\n\n-   **Nunca informe o ano**.\n-   Caso o cliente pergunte sobre horários disponíveis, apresente no máximo **quatro opções**.\n-   Não é necessário nenhum pagamento ou sinal para confirmar o agendamento.\n\n## DATA E HORA ATUALIZADOS\nUse estas informações como contexto de data e hora nas conversas:\n\n{{ $json.resultado }}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.8,
+      "position": [
+        640,
+        160
+      ],
+      "id": "557555dc-2ffa-4b78-9e67-ceb9e6843e57",
+      "name": "Fred"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Postgres Chat Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Fred",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Fred",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "setarInfo3": {
+      "main": [
+        [
+          {
+            "node": "Fred",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "criar_reuniao": {
+      "ai_tool": [
+        [
+          {
+            "node": "Fred",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "reagendar_reuniao": {
+      "ai_tool": [
+        [
+          {
+            "node": "Fred",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "cancelar_reuniao": {
+      "ai_tool": [
+        [
+          {
+            "node": "Fred",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ver_horarios": {
+      "ai_tool": [
+        [
+          {
+            "node": "Fred",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "proximos_dias",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "proximos_dias": {
+      "main": [
+        [
+          {
+            "node": "setarInfo3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fred": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "15731b4c-2d39-4d5c-957e-dfbcfff94ad5",
+  "meta": {
+    "instanceId": "33738330930e3881dd5571eca013f36ddf8aab20e4ea5c1f2ebaf4a2b4668ac6"
+  },
+  "id": "2dX0ktzu0JInjEIV",
+  "tags": []
+}

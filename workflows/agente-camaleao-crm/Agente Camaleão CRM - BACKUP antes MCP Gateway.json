@@ -1,0 +1,405 @@
+{
+  "name": "Agente Camaleão CRM",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "45975a6a-5548-424b-8f52-4708c1823784",
+      "name": "▶️ Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [
+        25120,
+        20368
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "agente-camaleao-crm",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "e0a4e7ae-9895-44cb-b10e-53a6c1f406b9",
+      "name": "🎯 Entrada Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        25120,
+        20576
+      ],
+      "webhookId": "agente-camaleao-crm"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9,15 * * *"
+            }
+          ]
+        }
+      },
+      "id": "1317c0f5-a699-4d11-be73-f2564859b9b5",
+      "name": "⏰ CRON Monitoramento",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        25136,
+        21056
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const API_URL = 'https://web-api.camaleaocamisas.com.br/graphql-api';\nconst EMAIL = 'api-gerente@email.com';\nconst PASSWORD = 'PPTDYBYqcmE7wg';\nconst DATA_CORTE = '2025-09-01';\nconst DIAS_LIMITE = 2;\n\nlet cookies = '';\n\nasync function graphqlRequest(query) {\n  const response = await this.helpers.httpRequest({\n    method: 'POST',\n    url: API_URL,\n    headers: { 'Content-Type': 'application/json', ...(cookies && { 'Cookie': cookies }) },\n    body: { query },\n    returnFullResponse: true\n  });\n  if (response.headers['set-cookie']) {\n    cookies = Array.isArray(response.headers['set-cookie']) \n      ? response.headers['set-cookie'].join('; ') \n      : response.headers['set-cookie'];\n  }\n  return JSON.parse(response.body);\n}\n\nawait graphqlRequest.call(this, `mutation { login(email: \"${EMAIL}\", password: \"${PASSWORD}\", remember: false) { id } }`);\n\nlet pedidosParados = [];\nconst hoje = new Date();\n\nfor (let page = 1; page <= 100; page++) {\n  const ordersQuery = await graphqlRequest.call(this, `\n    query {\n      orders(first: 100, page: ${page}) {\n        data {\n          id code created_at updated_at closed_at\n          status { id text }\n          client { name }\n          price\n        }\n      }\n    }\n  `);\n  if (!ordersQuery.data?.orders) break;\n  const pedidos = ordersQuery.data.orders.data;\n  if (pedidos.length === 0) break;\n  const filtrados = pedidos.filter(p => {\n    if (p.status.id !== '5') return false;\n    if (p.closed_at !== null) return false;\n    if (p.created_at < DATA_CORTE) return false;\n    const updatedAt = new Date(p.updated_at);\n    const diasParado = Math.floor((hoje - updatedAt) / (1000 * 60 * 60 * 24));\n    if (diasParado <= DIAS_LIMITE) return false;\n    p.dias_parado = diasParado;\n    return true;\n  });\n  pedidosParados = pedidosParados.concat(filtrados);\n}\n\nreturn pedidosParados.map(p => ({\n  json: {\n    pedido_id: p.id,\n    pedido_code: p.code,\n    cliente_nome: p.client.name,\n    status: p.status.text,\n    dias_parado: p.dias_parado,\n    criado_em: p.created_at,\n    atualizado_em: p.updated_at,\n    valor: p.price,\n    severidade: p.dias_parado > 7 ? 'CRITICAL' : 'HIGH'\n  }\n}));"
+      },
+      "id": "fb3939a5-6028-44d5-b701-1b8bcd30569c",
+      "name": "🔍 Detectar Pedidos Parados",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        25440,
+        21056
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "tem-pedidos",
+              "leftValue": "={{ $json.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a527a26c-138e-45d3-aa29-06a8c862dbd2",
+      "name": "❓ Tem Pedidos Parados?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        25744,
+        21056
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO oraculo_alertas (\n  agente_origem,\n  tipo,\n  severidade,\n  titulo,\n  detalhes,\n  entidade_id,\n  resolvido\n)\nVALUES (\n  'crm',\n  'CRM_PEDIDO_SUSPEITO',\n  '{{ $json.severidade }}',\n  'Pedido {{ $json.pedido_code }} parado há {{ $json.dias_parado }} dias',\n  '{{ $json }}',\n  '{{ $json.pedido_id }}',\n  false\n)\nON CONFLICT DO NOTHING;",
+        "options": {}
+      },
+      "id": "b504b4db-c5b7-4d9b-b863-e55373f40379",
+      "name": "💾 Criar Alerta no Banco",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        26048,
+        21056
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "NeXhhqHOZBJt16u4",
+          "name": "PostgresVPS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.pergunta ?? $json.body?.pergunta ?? $json.query?.pergunta ?? 'Como posso ajudar com os dados do CRM?' }}",
+        "options": {
+          "systemMessage": "Você é o Agente Camaleão CRM, especialista em dados da Camaleão Camisas.\n\nFERRAMENTAS DISPONÍVEIS (4 tools):\n\n1. **monitorar_pedidos_parados** - Detecta pedidos em 'Costurado e Embalado' parados > 2 dias (desde 01/09/2025)\n   Use para: pedidos parados, gargalos de produção, status travado\n\n2. **consultar_pedidos** - Busca pedidos por período (data_inicio, data_fim)\n   Use para: quantos pedidos, vendas do dia/semana/mês, valores de pedidos\n\n3. **espelho_bancario** - Recebimentos PIX/cartão/dinheiro (SUPORTA PERÍODOS!)\n\n   **Entrada flexível:**\n   - Dia único: { \"data\": \"hoje\" } ou { \"data\": \"2025-12-16\" }\n   - Período: { \"data_inicio\": \"2025-11-01\", \"data_fim\": \"2025-11-30\" }\n   - Natural: { \"periodo\": \"novembro\" }, { \"periodo\": \"ultimos 15 dias\" }, { \"periodo\": \"esta semana\" }\n\n   Chame a tool diretamente e apresente o resultado.\n\n4. **consultar_pagamentos** - Pendências de pagamento totais\n   Use para: quanto a receber, pendências, valores em aberto\n\nRESPONDA:\n- Clara e objetiva\n- Use R$ para valores brasileiros\n- Alerte URGENTE se pedido parado > 7 dias\n- Liste sempre os mais críticos primeiro\n- Quando falar de datas, use formato brasileiro (DD/MM/YYYY)\n"
+        }
+      },
+      "id": "87dfcea3-5aae-4831-a3dd-c01d03956e58",
+      "name": "🤖 Agente Camaleão",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        25632,
+        20480
+      ]
+    },
+    {
+      "parameters": {
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "id": "660e4899-52ff-49d2-85d3-de36b595c843",
+      "name": "OpenAI Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.1,
+      "position": [
+        25424,
+        20672
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "R96FVVEXWjB7bOTf",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "name": "monitorar_pedidos_parados",
+        "description": "Detecta pedidos em 'Costurado e Embalado' parados há mais de 2 dias (apenas pedidos criados a partir de 01/09/2025). Retorna lista de pedidos parados com dias parados, cliente, valor e severidade.",
+        "jsCode": "const API_URL = 'https://web-api.camaleaocamisas.com.br/graphql-api';\nconst EMAIL = 'api-gerente@email.com';\nconst PASSWORD = 'PPTDYBYqcmE7wg';\nconst DATA_CORTE = '2025-09-01';\nconst DIAS_LIMITE = 2;\n\nlet cookies = '';\n\nasync function graphqlRequest(query) {\n  const response = await this.helpers.httpRequest({\n    method: 'POST',\n    url: API_URL,\n    headers: { 'Content-Type': 'application/json', ...(cookies && { 'Cookie': cookies }) },\n    body: { query },\n    returnFullResponse: true\n  });\n  if (response.headers['set-cookie']) {\n    cookies = Array.isArray(response.headers['set-cookie']) \n      ? response.headers['set-cookie'].join('; ') \n      : response.headers['set-cookie'];\n  }\n  return JSON.parse(response.body);\n}\n\nawait graphqlRequest.call(this, `mutation { login(email: \"${EMAIL}\", password: \"${PASSWORD}\", remember: false) { id } }`);\n\nlet pedidosParados = [];\nconst hoje = new Date();\n\nfor (let page = 1; page <= 100; page++) {\n  const ordersQuery = await graphqlRequest.call(this, `\n    query {\n      orders(first: 100, page: ${page}) {\n        data {\n          id code created_at updated_at closed_at\n          status { id text }\n          client { name }\n          price\n        }\n      }\n    }\n  `);\n  if (!ordersQuery.data?.orders) break;\n  const pedidos = ordersQuery.data.orders.data;\n  if (pedidos.length === 0) break;\n  const filtrados = pedidos.filter(p => {\n    if (p.status.id !== '5') return false;\n    if (p.closed_at !== null) return false;\n    if (p.created_at < DATA_CORTE) return false;\n    const updatedAt = new Date(p.updated_at);\n    const diasParado = Math.floor((hoje - updatedAt) / (1000 * 60 * 60 * 24));\n    if (diasParado <= DIAS_LIMITE) return false;\n    p.dias_parado = diasParado;\n    return true;\n  });\n  pedidosParados = pedidosParados.concat(filtrados);\n}\n\nreturn JSON.stringify({\n  total: pedidosParados.length,\n  criticos: pedidosParados.filter(p => p.dias_parado > 7).length,\n  pedidos: pedidosParados.slice(0, 20).map(p => ({\n    codigo: p.code,\n    cliente: p.client.name,\n    dias_parado: p.dias_parado,\n    valor: p.price,\n    criado_em: p.created_at,\n    severidade: p.dias_parado > 7 ? 'CRÍTICO' : 'ALTO'\n  }))\n});",
+        "specifyInputSchema": true
+      },
+      "id": "4f64e76c-5e29-49ec-8442-792398142118",
+      "name": "⚠️ Tool: Monitorar Pedidos Parados",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.1,
+      "position": [
+        25424,
+        20832
+      ]
+    },
+    {
+      "parameters": {
+        "name": "consultar_pedidos",
+        "description": "Consulta pedidos criados em um período (data_inicio, data_fim no formato YYYY-MM-DD). Retorna total, valores e lista de pedidos.",
+        "jsCode": "const dataInicio = $input.item.json.data_inicio || new Date().toISOString().split('T')[0];\nconst dataFim = $input.item.json.data_fim || dataInicio;\nconst API_URL = 'https://web-api.camaleaocamisas.com.br/graphql-api';\nconst EMAIL = 'api-gerente@email.com';\nconst PASSWORD = 'PPTDYBYqcmE7wg';\nlet cookies = '';\n\nasync function graphqlRequest(query) {\n  const response = await this.helpers.httpRequest({\n    method: 'POST',\n    url: API_URL,\n    headers: { 'Content-Type': 'application/json', ...(cookies && { 'Cookie': cookies }) },\n    body: { query },\n    returnFullResponse: true\n  });\n  if (response.headers['set-cookie']) {\n    cookies = Array.isArray(response.headers['set-cookie']) \n      ? response.headers['set-cookie'].join('; ') \n      : response.headers['set-cookie'];\n  }\n  return JSON.parse(response.body);\n}\n\nawait graphqlRequest.call(this, `mutation { login(email: \"${EMAIL}\", password: \"${PASSWORD}\", remember: false) { id } }`);\nlet allOrders = [];\nfor (let page = 1; page <= 100; page++) {\n  const ordersQuery = await graphqlRequest.call(this, `query { orders(first: 100, page: ${page}) { data { id code created_at price total_paid total_owing client { name } } } }`);\n  if (!ordersQuery.data?.orders) break;\n  allOrders = allOrders.concat(ordersQuery.data.orders.data);\n}\nconst filtered = allOrders.filter(o => {\n  const createdDate = o.created_at.split(' ')[0];\n  return createdDate >= dataInicio && createdDate <= dataFim;\n});\nconst total = filtered.reduce((sum, o) => sum + (o.price || 0), 0);\nconst pago = filtered.reduce((sum, o) => sum + (o.total_paid || 0), 0);\nconst devendo = filtered.reduce((sum, o) => sum + (o.total_owing || 0), 0);\nreturn JSON.stringify({\n  periodo: `${dataInicio} a ${dataFim}`,\n  total_pedidos: filtered.length,\n  valor_total: total,\n  total_pago: pago,\n  total_devendo: devendo,\n  pedidos: filtered.slice(0, 15).map(o => ({ codigo: o.code, cliente: o.client?.name || 'Sem nome', valor: o.price, pago: o.total_paid, devendo: o.total_owing }))\n});",
+        "specifyInputSchema": true
+      },
+      "id": "117f8434-0c07-44c2-af51-c6247d86cc08",
+      "name": "📋 Tool: Consultar Pedidos",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.1,
+      "position": [
+        25632,
+        20832
+      ]
+    },
+    {
+      "parameters": {
+        "name": "espelho_bancario",
+        "description": "Consulta recebimentos PIX, cartão e dinheiro. SUPORTA PERÍODOS: dia único (data: 'hoje'), período manual (data_inicio, data_fim), ou período natural (periodo: 'novembro', 'ultimos 15 dias', 'esta semana', 'ano de 2025'). PROTEÇÕES: timeout 45s, máx 20 páginas (2000 registros). Retorna total recebido, saldo e detalhes por via.",
+        "jsCode": "function hojeSP() {\n  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date());\n}\n\nfunction normalizaData(raw) {\n  const s = String(raw || '').trim();\n  if (!s || ['hoje','hj'].includes(s.toLowerCase())) return hojeSP();\n  if (/^\\d{4}-\\d{2}-\\d{2}$/.test(s)) return s;\n  if (/^\\d{2}\\/\\d{2}\\/\\d{4}$/.test(s)) {\n    const [dd, mm, yyyy] = s.split('/');\n    return `${yyyy}-${mm}-${dd}`;\n  }\n  return hojeSP();\n}\n\nfunction isoParaBR(iso) {\n  const [y, m, d] = String(iso).split('-');\n  if (!y || !m || !d) return String(iso);\n  return `${d}/${m}/${y}`;\n}\n\nfunction formatarDinheiro(valor) {\n  return valor.toFixed(2).replace('.', ',');\n}\n\nfunction getDataAtualSP() {\n  const agora = new Date();\n  const brasiliaStr = agora.toLocaleString('en-US', {\n    timeZone: 'America/Sao_Paulo',\n    year: 'numeric',\n    month: '2-digit',\n    day: '2-digit'\n  });\n  const [mesStr, diaStr, anoStr] = brasiliaStr.split('/');\n  return new Date(parseInt(anoStr), parseInt(mesStr) - 1, parseInt(diaStr));\n}\n\nfunction parsePeriodo(input) {\n  const hoje = getDataAtualSP();\n  const s = String(input || '').toLowerCase().trim();\n\n  const fmt = (d) => {\n    const ano = d.getFullYear();\n    const mes = String(d.getMonth() + 1).padStart(2, '0');\n    const dia = String(d.getDate()).padStart(2, '0');\n    return `${ano}-${mes}-${dia}`;\n  };\n\n  const subDias = (data, dias) => {\n    const d = new Date(data);\n    d.setDate(d.getDate() - dias);\n    return d;\n  };\n\n  // \"últimos X dias\"\n  const ultimosDiasMatch = s.match(/ultim[oa]s?\\s+(\\d+)\\s+dias?/);\n  if (ultimosDiasMatch) {\n    const dias = parseInt(ultimosDiasMatch[1]);\n    return {\n      data_inicio: fmt(subDias(hoje, dias - 1)),\n      data_fim: fmt(hoje),\n      label: `últimos ${dias} dias`\n    };\n  }\n\n  // \"esta semana\" (do início da semana até hoje)\n  if (s.includes('esta semana') || s.includes('essa semana') || s.includes('nessa semana')) {\n    const diaSemana = hoje.getDay(); // 0=domingo, 1=segunda, ..., 6=sábado\n    // Calcular quantos dias desde a última segunda-feira\n    const diasDesdeSegunda = diaSemana === 0 ? 6 : diaSemana - 1;\n    const segundaFeira = subDias(hoje, diasDesdeSegunda);\n    return {\n      data_inicio: fmt(segundaFeira),\n      data_fim: fmt(hoje),\n      label: 'esta semana'\n    };\n  }\n\n  // \"semana passada\" (segunda a domingo da semana anterior)\n  if (s.includes('semana passada')) {\n    const diaSemana = hoje.getDay();\n    const diasDesdeSegunda = diaSemana === 0 ? 6 : diaSemana - 1;\n    // Segunda-feira da semana passada (7 dias antes da última segunda)\n    const segundaPassada = subDias(hoje, diasDesdeSegunda + 7);\n    // Domingo da semana passada (1 dia antes da última segunda)\n    const domingoPassado = subDias(hoje, diasDesdeSegunda + 1);\n    return {\n      data_inicio: fmt(segundaPassada),\n      data_fim: fmt(domingoPassado),\n      label: 'semana passada'\n    };\n  }\n\n  // \"este mês\" ou \"esse mes\"\n  if (s.includes('este m') || s.includes('esse m') || s.includes('nesse m')) {\n    const primeiroDia = new Date(hoje.getFullYear(), hoje.getMonth(), 1);\n    return {\n      data_inicio: fmt(primeiroDia),\n      data_fim: fmt(hoje),\n      label: 'este mês'\n    };\n  }\n\n  // Meses por nome\n  const meses = {\n    'janeiro': 0, 'fevereiro': 1, 'março': 2, 'marco': 2, 'abril': 3,\n    'maio': 4, 'junho': 5, 'julho': 6, 'agosto': 7,\n    'setembro': 8, 'outubro': 9, 'novembro': 10, 'dezembro': 11\n  };\n\n  for (const [nome, mes] of Object.entries(meses)) {\n    if (s.includes(nome)) {\n      let ano = hoje.getFullYear();\n      const anoMatch = s.match(/\\b(20\\d{2})\\b/);\n      if (anoMatch) {\n        ano = parseInt(anoMatch[1]);\n      }\n\n      const primeiroDia = new Date(ano, mes, 1);\n      const ultimoDia = new Date(ano, mes + 1, 0);\n\n      return {\n        data_inicio: fmt(primeiroDia),\n        data_fim: fmt(ultimoDia),\n        label: `${nome}/${ano}`\n      };\n    }\n  }\n\n  return null;\n}\n\n// ═════════════════════════════════════════════════════════════\n// PROCESSAMENTO DO INPUT\n// ═════════════════════════════════════════════════════════════\n\nconst input = $input?.item?.json || {};\n\nlet dataInicio, dataFim, periodoLabel;\n\nconst periodoDetectado = parsePeriodo(\n  input.periodo || input.data || input.mes || input.quando || ''\n);\n\nif (periodoDetectado) {\n  dataInicio = periodoDetectado.data_inicio;\n  dataFim = periodoDetectado.data_fim;\n  periodoLabel = periodoDetectado.label;\n} else {\n  if (input.data_inicio && input.data_fim) {\n    dataInicio = normalizaData(input.data_inicio);\n    dataFim = normalizaData(input.data_fim);\n    periodoLabel = `${isoParaBR(dataInicio)} a ${isoParaBR(dataFim)}`;\n  } else if (input.data) {\n    dataInicio = normalizaData(input.data);\n    dataFim = dataInicio;\n    periodoLabel = isoParaBR(dataInicio);\n  } else {\n    dataInicio = hojeSP();\n    dataFim = dataInicio;\n    periodoLabel = 'hoje';\n  }\n}\n\nconsole.log(`[ESPELHO v3.1] Período: ${periodoLabel} (${dataInicio} a ${dataFim})`);\n\n// ═════════════════════════════════════════════════════════════\n// CONFIG\n// ═════════════════════════════════════════════════════════════\n\nconst apiUrl = 'https://web-api.camaleaocamisas.com.br/graphql-api';\nconst email = 'api-gerente@email.com';\nconst password = 'PPTDYBYqcmE7wg';\n\nconst viasMap = {\n  '1': 'Caixa',\n  '2': 'Banco do Brasil',\n  '3': 'Nubank',\n  '4': 'Dinheiro',\n  '5': 'Cartão de crédito',\n  '6': 'Cora',\n  '7': 'Banco Inter',\n  '8': 'Mercado Pago',\n};\n\nlet cookies = '';\nconst httpRequest = this.helpers.httpRequest.bind(this.helpers);\n\nasync function graphqlRequest(query, full = false) {\n  const res = await httpRequest({\n    method: 'POST',\n    url: apiUrl,\n    headers: {\n      'Content-Type': 'application/json',\n      ...(cookies ? { Cookie: cookies } : {}),\n    },\n    body: { query },\n    returnFullResponse: true,\n  });\n\n  const setCookie = res?.headers?.['set-cookie'];\n  if (setCookie) {\n    cookies = Array.isArray(setCookie)\n      ? setCookie.map((c) => String(c).split(';')[0]).join('; ')\n      : String(setCookie).split(';')[0];\n  }\n\n  const body = res.body;\n  const jsonBody = typeof body === 'string' ? JSON.parse(body) : body;\n\n  return full ? { ...res, json: jsonBody } : jsonBody;\n}\n\n// ═════════════════════════════════════════════════════════════\n// EXECUÇÃO COM TIMEOUT\n// ═════════════════════════════════════════════════════════════\n\nconst TIMEOUT_MS = 45000; // 45 segundos\nconst MAX_PAGINAS = 20; // Máximo 2000 registros\n\nasync function executar() {\n  try {\n    console.log('[ESPELHO] Login...');\n    const loginResult = await graphqlRequest(\n      `mutation { login(email: \"${email}\", password: \"${password}\", remember: false) { id name } }`,\n      true\n    );\n\n    if (loginResult.json.errors) {\n      throw new Error(`Login falhou: ${JSON.stringify(loginResult.json.errors)}`);\n    }\n\n    console.log('[ESPELHO] Login OK');\n\n    let allEntries = [];\n    let currentPage = 1;\n    let totalPages = 1;\n    const perPage = 100;\n\n    console.log('[ESPELHO] Buscando dados...');\n\n    while (currentPage <= totalPages && currentPage <= MAX_PAGINAS) {\n      const entriesQuery = await graphqlRequest(\n        `query {\n          entriesBankMirror(first: ${perPage}, page: ${currentPage}) {\n            data {\n              id\n              description\n              value\n              date\n              via_id\n            }\n            paginatorInfo {\n              currentPage\n              lastPage\n              total\n            }\n          }\n        }`\n      );\n\n      if (entriesQuery.errors) {\n        throw new Error(`Query falhou: ${JSON.stringify(entriesQuery.errors)}`);\n      }\n\n      const data = entriesQuery?.data?.entriesBankMirror?.data || [];\n      const paginator = entriesQuery?.data?.entriesBankMirror?.paginatorInfo;\n\n      if (paginator) {\n        totalPages = paginator.lastPage;\n        console.log(`[ESPELHO] Pág ${currentPage}/${totalPages} - ${data.length} reg`);\n      }\n\n      allEntries = allEntries.concat(data);\n\n      // Se não tem mais dados, para\n      if (data.length === 0) break;\n\n      currentPage++;\n    }\n\n    console.log(`[ESPELHO] Total carregado: ${allEntries.length}`);\n\n    // Filtrar pelo período\n    const filtered = allEntries\n      .filter((e) => {\n        const dataReg = String(e?.date || '').split(' ')[0];\n        return dataReg >= dataInicio && dataReg <= dataFim;\n      })\n      .map((e) => ({\n        ...e,\n        value: Number(e?.value || 0),\n        via_id: String(e?.via_id ?? ''),\n        via: viasMap[String(e?.via_id ?? '')] || `Via ${String(e?.via_id ?? '')}`,\n      }));\n\n    console.log(`[ESPELHO] Filtrados: ${filtered.length}`);\n\n    if (filtered.length === 0) {\n      return {\n        periodo_label: periodoLabel,\n        mensagem: `Não houve recebimentos em ${periodoLabel}.`,\n        total_recebido: 0\n      };\n    }\n\n    const recebimentos = filtered.filter((e) => e.value > 0);\n    const pagamentos = filtered.filter((e) => e.value < 0);\n\n    // Agrupar por via\n    const porVia = {};\n    for (const e of recebimentos) {\n      if (!porVia[e.via]) porVia[e.via] = [];\n      porVia[e.via].push(e.value);\n    }\n\n    const resumo = Object.entries(porVia).map(([via, valores]) => ({\n      via,\n      total: valores.reduce((s, v) => s + v, 0)\n    }));\n\n    resumo.sort((a, b) => b.total - a.total);\n\n    const totalRecebido = recebimentos.reduce((s, e) => s + e.value, 0);\n    const totalPago = pagamentos.reduce((s, e) => s + e.value, 0);\n    const saldo = totalRecebido + totalPago;\n\n    // Formatar mensagem\n    let msg = `📊 Recebimentos de ${periodoLabel}:\\n\\n`;\n    for (const item of resumo) {\n      msg += `${item.via} - R$ ${formatarDinheiro(item.total)}\\n`;\n    }\n    msg += `\\nTotal = R$ ${formatarDinheiro(totalRecebido)}`;\n\n    if (totalPago < 0) {\n      msg += `\\n\\n💸 Pagamentos: R$ ${formatarDinheiro(Math.abs(totalPago))}`;\n      msg += `\\n💰 Saldo líquido: R$ ${formatarDinheiro(saldo)}`;\n    }\n\n    return {\n      periodo_label: periodoLabel,\n      mensagem: msg,\n      total_recebido: totalRecebido,\n      saldo_periodo: saldo,\n      recebimentos_por_via: resumo\n    };\n\n  } catch (err) {\n    console.error('[ESPELHO] ERRO:', err.message);\n    throw err;\n  }\n}\n\n// Executar com timeout\nconst resultado = await Promise.race([\n  executar(),\n  new Promise((_, reject) =>\n    setTimeout(() => reject(new Error('Timeout: consulta demorou mais de 45s')), TIMEOUT_MS)\n  )\n]);\n\nreturn JSON.stringify(resultado);\n",
+        "specifyInputSchema": true
+      },
+      "id": "2a01a299-2521-47a2-9163-2f1d729ecb75",
+      "name": "💰 Tool: Espelho Bancário",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.1,
+      "position": [
+        25824,
+        20832
+      ]
+    },
+    {
+      "parameters": {
+        "name": "consultar_pagamentos",
+        "description": "Consulta pendências de pagamento. Retorna total pago e total a receber de todos os pedidos pendentes.",
+        "jsCode": "const API_URL = 'https://web-api.camaleaocamisas.com.br/graphql-api';\nconst EMAIL = 'api-gerente@email.com';\nconst PASSWORD = 'PPTDYBYqcmE7wg';\nlet cookies = '';\n\nasync function graphqlRequest(query) {\n  const response = await this.helpers.httpRequest({\n    method: 'POST',\n    url: API_URL,\n    headers: { 'Content-Type': 'application/json', ...(cookies && { 'Cookie': cookies }) },\n    body: { query },\n    returnFullResponse: true\n  });\n  if (response.headers['set-cookie']) {\n    cookies = Array.isArray(response.headers['set-cookie']) \n      ? response.headers['set-cookie'].join('; ') \n      : response.headers['set-cookie'];\n  }\n  return JSON.parse(response.body);\n}\n\nawait graphqlRequest.call(this, `mutation { login(email: \"${EMAIL}\", password: \"${PASSWORD}\", remember: false) { id } }`);\nconst pendenciesQuery = await graphqlRequest.call(this, `query { paymentsPendencies { total_paid total_unpaid } }`);\nconst data = pendenciesQuery.data.paymentsPendencies;\nreturn JSON.stringify({\n  total_pago: data.total_paid,\n  total_a_receber: data.total_unpaid,\n  mensagem: `Total já pago: R$ ${data.total_paid.toFixed(2).replace('.', ',')} | Pendente: R$ ${data.total_unpaid.toFixed(2).replace('.', ',')}`\n});",
+        "specifyInputSchema": true
+      },
+      "id": "0f9e7791-ac75-4bea-929e-7e2613e6dd82",
+      "name": "💳 Tool: Consultar Pagamentos",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.1,
+      "position": [
+        26032,
+        20832
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "prep-response",
+              "name": "resposta",
+              "value": "={{ $json.output }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "49fd2824-6034-4298-86c3-7d3739d9fa7b",
+      "name": "📝 Formatar Resposta",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        25920,
+        20480
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "ea30e9cb-f3ac-497f-a0d7-f73e0208598a",
+      "name": "📤 Responder Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        26224,
+        20480
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "▶️ Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "🤖 Agente Camaleão",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🎯 Entrada Webhook": {
+      "main": [
+        [
+          {
+            "node": "🤖 Agente Camaleão",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⏰ CRON Monitoramento": {
+      "main": [
+        [
+          {
+            "node": "🔍 Detectar Pedidos Parados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔍 Detectar Pedidos Parados": {
+      "main": [
+        [
+          {
+            "node": "❓ Tem Pedidos Parados?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "❓ Tem Pedidos Parados?": {
+      "main": [
+        [
+          {
+            "node": "💾 Criar Alerta no Banco",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🤖 Agente Camaleão": {
+      "main": [
+        [
+          {
+            "node": "📝 Formatar Resposta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "🤖 Agente Camaleão",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⚠️ Tool: Monitorar Pedidos Parados": {
+      "ai_tool": [
+        [
+          {
+            "node": "🤖 Agente Camaleão",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📋 Tool: Consultar Pedidos": {
+      "ai_tool": [
+        [
+          {
+            "node": "🤖 Agente Camaleão",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "💰 Tool: Espelho Bancário": {
+      "ai_tool": [
+        [
+          {
+            "node": "🤖 Agente Camaleão",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "💳 Tool: Consultar Pagamentos": {
+      "ai_tool": [
+        [
+          {
+            "node": "🤖 Agente Camaleão",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📝 Formatar Resposta": {
+      "main": [
+        [
+          {
+            "node": "📤 Responder Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "a37800b1-22a9-49b7-a532-07929e35129b",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f531fb252dbf40665fefaa3181beaeea61ace3a35a4d3addc3ce931c6136823a"
+  },
+  "id": "vwKXcDZZXMVbiwqS",
+  "tags": []
+}

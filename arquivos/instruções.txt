@@ -1,0 +1,5 @@
+📱 Agente Camaleão WhatsApp
+
+Este agente será responsável por acessar dados do WhatsApp da Camaleão Camisas.
+
+Aguardando instruções do usuário para configuração...

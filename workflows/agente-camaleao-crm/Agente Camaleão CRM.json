@@ -1,0 +1,431 @@
+{
+  "name": "Agente Camaleão CRM + MCP Gateway",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "45975a6a-5548-424b-8f52-4708c1823784",
+      "name": "▶️ Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [
+        25120,
+        20368
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "agente-camaleao-crm",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "e0a4e7ae-9895-44cb-b10e-53a6c1f406b9",
+      "name": "🎯 Entrada Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        25120,
+        20576
+      ],
+      "webhookId": "agente-camaleao-crm"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9,15 * * *"
+            }
+          ]
+        }
+      },
+      "id": "1317c0f5-a699-4d11-be73-f2564859b9b5",
+      "name": "⏰ CRON Monitoramento",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        25136,
+        21056
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const API_URL = 'https://web-api.camaleaocamisas.com.br/graphql-api';\nconst EMAIL = 'api-gerente@email.com';\nconst PASSWORD = 'PPTDYBYqcmE7wg';\nconst DATA_CORTE = '2025-09-01';\nconst DIAS_LIMITE = 2;\n\nlet cookies = '';\n\nasync function graphqlRequest(query) {\n  const response = await this.helpers.httpRequest({\n    method: 'POST',\n    url: API_URL,\n    headers: { 'Content-Type': 'application/json', ...(cookies && { 'Cookie': cookies }) },\n    body: { query },\n    returnFullResponse: true\n  });\n  if (response.headers['set-cookie']) {\n    cookies = Array.isArray(response.headers['set-cookie']) \n      ? response.headers['set-cookie'].join('; ') \n      : response.headers['set-cookie'];\n  }\n  return JSON.parse(response.body);\n}\n\nawait graphqlRequest.call(this, `mutation { login(email: \"${EMAIL}\", password: \"${PASSWORD}\", remember: false) { id } }`);\n\nlet pedidosParados = [];\nconst hoje = new Date();\n\nfor (let page = 1; page <= 100; page++) {\n  const ordersQuery = await graphqlRequest.call(this, `\n    query {\n      orders(first: 100, page: ${page}) {\n        data {\n          id code created_at updated_at closed_at\n          status { id text }\n          client { name }\n          price\n        }\n      }\n    }\n  `);\n  if (!ordersQuery.data?.orders) break;\n  const pedidos = ordersQuery.data.orders.data;\n  if (pedidos.length === 0) break;\n  const filtrados = pedidos.filter(p => {\n    if (p.status.id !== '5') return false;\n    if (p.closed_at !== null) return false;\n    if (p.created_at < DATA_CORTE) return false;\n    const updatedAt = new Date(p.updated_at);\n    const diasParado = Math.floor((hoje - updatedAt) / (1000 * 60 * 60 * 24));\n    if (diasParado <= DIAS_LIMITE) return false;\n    p.dias_parado = diasParado;\n    return true;\n  });\n  pedidosParados = pedidosParados.concat(filtrados);\n}\n\nreturn pedidosParados.map(p => ({\n  json: {\n    pedido_id: p.id,\n    pedido_code: p.code,\n    cliente_nome: p.client.name,\n    status: p.status.text,\n    dias_parado: p.dias_parado,\n    criado_em: p.created_at,\n    atualizado_em: p.updated_at,\n    valor: p.price,\n    severidade: p.dias_parado > 7 ? 'CRITICAL' : 'HIGH'\n  }\n}));"
+      },
+      "id": "fb3939a5-6028-44d5-b701-1b8bcd30569c",
+      "name": "🔍 Detectar Pedidos Parados",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        25440,
+        21056
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "tem-pedidos",
+              "leftValue": "={{ $json.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a527a26c-138e-45d3-aa29-06a8c862dbd2",
+      "name": "❓ Tem Pedidos Parados?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        25744,
+        21056
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO oraculo_alertas (\n  agente_origem,\n  tipo,\n  severidade,\n  titulo,\n  detalhes,\n  entidade_id,\n  resolvido\n)\nVALUES (\n  'crm',\n  'CRM_PEDIDO_SUSPEITO',\n  '{{ $json.severidade }}',\n  'Pedido {{ $json.pedido_code }} parado há {{ $json.dias_parado }} dias',\n  '{{ $json }}',\n  '{{ $json.pedido_id }}',\n  false\n)\nON CONFLICT DO NOTHING;",
+        "options": {}
+      },
+      "id": "b504b4db-c5b7-4d9b-b863-e55373f40379",
+      "name": "💾 Criar Alerta no Banco",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        26048,
+        21056
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "NeXhhqHOZBJt16u4",
+          "name": "PostgresVPS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.pergunta ?? $json.body?.pergunta ?? $json.query?.pergunta ?? 'Como posso ajudar com os dados do CRM?' }}",
+        "options": {
+          "systemMessage": "Você é o Agente Camaleão CRM, especialista em dados da Camaleão Camisas.\n\nFERRAMENTAS DISPONÍVEIS (4 tools):\n\n1. **monitorar_pedidos_parados** - Detecta pedidos em 'Costurado e Embalado' parados > 2 dias (desde 01/09/2025)\n   Use para: pedidos parados, gargalos de produção, status travado\n\n2. **consultar_pedidos** - Busca pedidos por período (data_inicio, data_fim)\n   Use para: quantos pedidos, vendas do dia/semana/mês, valores de pedidos\n\n3. **espelho_bancario_gateway** - Recebimentos PIX/cartão/dinheiro via MCP Gateway (SEM TIMEOUT!)\n\n   **Entrada flexível:**\n   - Dia único: { \"periodo\": \"hoje\" }\n   - Período natural: { \"periodo\": \"novembro\" }, { \"periodo\": \"ultimos 15 dias\" }, { \"periodo\": \"esta semana\" }, { \"periodo\": \"semana passada\" }\n   - Período manual: { \"data_inicio\": \"2025-11-01\", \"data_fim\": \"2025-11-30\" }\n\n   Chame a tool diretamente e apresente o resultado. SEM LIMITE DE TIMEOUT!\n\n4. **consultar_pagamentos** - Pendências de pagamento totais\n   Use para: quanto a receber, pendências, valores em aberto\n\nRESPONDA:\n- Clara e objetiva\n- Use R$ para valores brasileiros\n- Alerte URGENTE se pedido parado > 7 dias\n- Liste sempre os mais críticos primeiro\n- Quando falar de datas, use formato brasileiro (DD/MM/YYYY)\n"
+        }
+      },
+      "id": "87dfcea3-5aae-4831-a3dd-c01d03956e58",
+      "name": "🤖 Agente Camaleão",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        25632,
+        20480
+      ]
+    },
+    {
+      "parameters": {
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "id": "660e4899-52ff-49d2-85d3-de36b595c843",
+      "name": "OpenAI Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.1,
+      "position": [
+        25424,
+        20672
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "R96FVVEXWjB7bOTf",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "name": "monitorar_pedidos_parados",
+        "description": "Detecta pedidos em 'Costurado e Embalado' parados há mais de 2 dias (apenas pedidos criados a partir de 01/09/2025). Retorna lista de pedidos parados com dias parados, cliente, valor e severidade.",
+        "jsCode": "const API_URL = 'https://web-api.camaleaocamisas.com.br/graphql-api';\nconst EMAIL = 'api-gerente@email.com';\nconst PASSWORD = 'PPTDYBYqcmE7wg';\nconst DATA_CORTE = '2025-09-01';\nconst DIAS_LIMITE = 2;\n\nlet cookies = '';\n\nasync function graphqlRequest(query) {\n  const response = await this.helpers.httpRequest({\n    method: 'POST',\n    url: API_URL,\n    headers: { 'Content-Type': 'application/json', ...(cookies && { 'Cookie': cookies }) },\n    body: { query },\n    returnFullResponse: true\n  });\n  if (response.headers['set-cookie']) {\n    cookies = Array.isArray(response.headers['set-cookie']) \n      ? response.headers['set-cookie'].join('; ') \n      : response.headers['set-cookie'];\n  }\n  return JSON.parse(response.body);\n}\n\nawait graphqlRequest.call(this, `mutation { login(email: \"${EMAIL}\", password: \"${PASSWORD}\", remember: false) { id } }`);\n\nlet pedidosParados = [];\nconst hoje = new Date();\n\nfor (let page = 1; page <= 100; page++) {\n  const ordersQuery = await graphqlRequest.call(this, `\n    query {\n      orders(first: 100, page: ${page}) {\n        data {\n          id code created_at updated_at closed_at\n          status { id text }\n          client { name }\n          price\n        }\n      }\n    }\n  `);\n  if (!ordersQuery.data?.orders) break;\n  const pedidos = ordersQuery.data.orders.data;\n  if (pedidos.length === 0) break;\n  const filtrados = pedidos.filter(p => {\n    if (p.status.id !== '5') return false;\n    if (p.closed_at !== null) return false;\n    if (p.created_at < DATA_CORTE) return false;\n    const updatedAt = new Date(p.updated_at);\n    const diasParado = Math.floor((hoje - updatedAt) / (1000 * 60 * 60 * 24));\n    if (diasParado <= DIAS_LIMITE) return false;\n    p.dias_parado = diasParado;\n    return true;\n  });\n  pedidosParados = pedidosParados.concat(filtrados);\n}\n\nreturn JSON.stringify({\n  total: pedidosParados.length,\n  criticos: pedidosParados.filter(p => p.dias_parado > 7).length,\n  pedidos: pedidosParados.slice(0, 20).map(p => ({\n    codigo: p.code,\n    cliente: p.client.name,\n    dias_parado: p.dias_parado,\n    valor: p.price,\n    criado_em: p.created_at,\n    severidade: p.dias_parado > 7 ? 'CRÍTICO' : 'ALTO'\n  }))\n});",
+        "specifyInputSchema": true
+      },
+      "id": "4f64e76c-5e29-49ec-8442-792398142118",
+      "name": "⚠️ Tool: Monitorar Pedidos Parados",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.1,
+      "position": [
+        25424,
+        20832
+      ]
+    },
+    {
+      "parameters": {
+        "name": "consultar_pedidos",
+        "description": "Consulta pedidos criados em um período (data_inicio, data_fim no formato YYYY-MM-DD). Retorna total, valores e lista de pedidos.",
+        "jsCode": "const dataInicio = $input.item.json.data_inicio || new Date().toISOString().split('T')[0];\nconst dataFim = $input.item.json.data_fim || dataInicio;\nconst API_URL = 'https://web-api.camaleaocamisas.com.br/graphql-api';\nconst EMAIL = 'api-gerente@email.com';\nconst PASSWORD = 'PPTDYBYqcmE7wg';\nlet cookies = '';\n\nasync function graphqlRequest(query) {\n  const response = await this.helpers.httpRequest({\n    method: 'POST',\n    url: API_URL,\n    headers: { 'Content-Type': 'application/json', ...(cookies && { 'Cookie': cookies }) },\n    body: { query },\n    returnFullResponse: true\n  });\n  if (response.headers['set-cookie']) {\n    cookies = Array.isArray(response.headers['set-cookie']) \n      ? response.headers['set-cookie'].join('; ') \n      : response.headers['set-cookie'];\n  }\n  return JSON.parse(response.body);\n}\n\nawait graphqlRequest.call(this, `mutation { login(email: \"${EMAIL}\", password: \"${PASSWORD}\", remember: false) { id } }`);\nlet allOrders = [];\nfor (let page = 1; page <= 100; page++) {\n  const ordersQuery = await graphqlRequest.call(this, `query { orders(first: 100, page: ${page}) { data { id code created_at price total_paid total_owing client { name } } } }`);\n  if (!ordersQuery.data?.orders) break;\n  allOrders = allOrders.concat(ordersQuery.data.orders.data);\n}\nconst filtered = allOrders.filter(o => {\n  const createdDate = o.created_at.split(' ')[0];\n  return createdDate >= dataInicio && createdDate <= dataFim;\n});\nconst total = filtered.reduce((sum, o) => sum + (o.price || 0), 0);\nconst pago = filtered.reduce((sum, o) => sum + (o.total_paid || 0), 0);\nconst devendo = filtered.reduce((sum, o) => sum + (o.total_owing || 0), 0);\nreturn JSON.stringify({\n  periodo: `${dataInicio} a ${dataFim}`,\n  total_pedidos: filtered.length,\n  valor_total: total,\n  total_pago: pago,\n  total_devendo: devendo,\n  pedidos: filtered.slice(0, 15).map(o => ({ codigo: o.code, cliente: o.client?.name || 'Sem nome', valor: o.price, pago: o.total_paid, devendo: o.total_owing }))\n});",
+        "specifyInputSchema": true
+      },
+      "id": "117f8434-0c07-44c2-af51-c6247d86cc08",
+      "name": "📋 Tool: Consultar Pedidos",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.1,
+      "position": [
+        25632,
+        20832
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://gestorconecta-mcp-gateway.oxlser.easypanel.host/mcp/crm/espelho_bancario",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": []
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "autodetect"
+            }
+          }
+        }
+      },
+      "id": "NEW_HTTP_REQUEST_TOOL_ID",
+      "name": "🌐 Tool: Espelho Bancário Gateway",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        25824,
+        20832
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "NEW_API_KEY_CREDENTIAL",
+          "name": "MCP Gateway API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "name": "consultar_pagamentos",
+        "description": "Consulta pendências de pagamento. Retorna total pago e total a receber de todos os pedidos pendentes.",
+        "jsCode": "const API_URL = 'https://web-api.camaleaocamisas.com.br/graphql-api';\nconst EMAIL = 'api-gerente@email.com';\nconst PASSWORD = 'PPTDYBYqcmE7wg';\nlet cookies = '';\n\nasync function graphqlRequest(query) {\n  const response = await this.helpers.httpRequest({\n    method: 'POST',\n    url: API_URL,\n    headers: { 'Content-Type': 'application/json', ...(cookies && { 'Cookie': cookies }) },\n    body: { query },\n    returnFullResponse: true\n  });\n  if (response.headers['set-cookie']) {\n    cookies = Array.isArray(response.headers['set-cookie']) \n      ? response.headers['set-cookie'].join('; ') \n      : response.headers['set-cookie'];\n  }\n  return JSON.parse(response.body);\n}\n\nawait graphqlRequest.call(this, `mutation { login(email: \"${EMAIL}\", password: \"${PASSWORD}\", remember: false) { id } }`);\nconst pendenciesQuery = await graphqlRequest.call(this, `query { paymentsPendencies { total_paid total_unpaid } }`);\nconst data = pendenciesQuery.data.paymentsPendencies;\nreturn JSON.stringify({\n  total_pago: data.total_paid,\n  total_a_receber: data.total_unpaid,\n  mensagem: `Total já pago: R$ ${data.total_paid.toFixed(2).replace('.', ',')} | Pendente: R$ ${data.total_unpaid.toFixed(2).replace('.', ',')}`\n});",
+        "specifyInputSchema": true
+      },
+      "id": "0f9e7791-ac75-4bea-929e-7e2613e6dd82",
+      "name": "💳 Tool: Consultar Pagamentos",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.1,
+      "position": [
+        26032,
+        20832
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "prep-response",
+              "name": "resposta",
+              "value": "={{ $json.output }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "49fd2824-6034-4298-86c3-7d3739d9fa7b",
+      "name": "📝 Formatar Resposta",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        25920,
+        20480
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "ea30e9cb-f3ac-497f-a0d7-f73e0208598a",
+      "name": "📤 Responder Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        26224,
+        20480
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "▶️ Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "🤖 Agente Camaleão",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🎯 Entrada Webhook": {
+      "main": [
+        [
+          {
+            "node": "🤖 Agente Camaleão",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⏰ CRON Monitoramento": {
+      "main": [
+        [
+          {
+            "node": "🔍 Detectar Pedidos Parados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔍 Detectar Pedidos Parados": {
+      "main": [
+        [
+          {
+            "node": "❓ Tem Pedidos Parados?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "❓ Tem Pedidos Parados?": {
+      "main": [
+        [
+          {
+            "node": "💾 Criar Alerta no Banco",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🤖 Agente Camaleão": {
+      "main": [
+        [
+          {
+            "node": "📝 Formatar Resposta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "🤖 Agente Camaleão",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⚠️ Tool: Monitorar Pedidos Parados": {
+      "ai_tool": [
+        [
+          {
+            "node": "🤖 Agente Camaleão",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📋 Tool: Consultar Pedidos": {
+      "ai_tool": [
+        [
+          {
+            "node": "🤖 Agente Camaleão",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🌐 Tool: Espelho Bancário Gateway": {
+      "ai_tool": [
+        [
+          {
+            "node": "🤖 Agente Camaleão",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "💳 Tool: Consultar Pagamentos": {
+      "ai_tool": [
+        [
+          {
+            "node": "🤖 Agente Camaleão",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📝 Formatar Resposta": {
+      "main": [
+        [
+          {
+            "node": "📤 Responder Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "NEW_VERSION_WITH_MCP_GATEWAY",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f531fb252dbf40665fefaa3181beaeea61ace3a35a4d3addc3ce931c6136823a"
+  },
+  "id": "vwKXcDZZXMVbiwqS",
+  "tags": []
+}

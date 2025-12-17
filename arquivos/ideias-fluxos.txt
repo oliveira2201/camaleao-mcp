@@ -1,0 +1,18 @@
+Ideias de fluxos n8n (visão geral)
+
+1) Oraculo Central
+- Webhook recebe comando WhatsApp, valida remetente autorizado, filtra eventos duplicados/sem texto.
+- Classifica intenção por palavras-chave básicas (meta_ads, vendas, agenda, prospeccao).
+- Consulta tabela webhook_routing para decidir o destino e aciona o webhook do bot correspondente.
+- Envia mensagem de “aguarde”, repassa o comando e retorna a resposta ao usuário; registra log em banco.
+- Ramo de fallback IA: se não houver regra, consulta OpenAI e envia resposta, além de mandar payload para fluxo de aprendizado.
+
+2) Bot Meta Ads – Resposta
+- Webhook recebe comando meta_ads.
+- Busca campanhas e insights do Facebook Ads (conta Camaleao Camisas) com token/ID de conta do .env.
+- Formata relatório curto (campanhas ativas, gasto, impressões, cliques, conversões, CPC) e responde ao webhook.
+
+3) Oraculo Aprendizado (Fallback)
+- Webhook oraculo-aprendizado recebe payloads sem rota.
+- Extrai remetente/nome/mensagem, grava em oraculo_aprendizado no Postgres.
+- Responde ao WhatsApp com aviso de que ainda vai aprender e inclui ID da solicitação.

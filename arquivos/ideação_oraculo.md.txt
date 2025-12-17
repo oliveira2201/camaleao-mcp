@@ -1,0 +1,182 @@
+# Oráculo Central – Visão Geral, Bancos e Status do Projeto  
+> Versão: 0.2 – Roteador IA + Meta Ads + Memória em Banco  
+> Autor: Wellington (com apoio da IA)
+
+---
+
+## 1. Visão Geral do Oráculo Central
+
+O **Oráculo Central** é o “cérebro” do ecossistema WhatsApp do GestorConecta.
+
+Ele funciona como um **roteador inteligente de conversas**:
+
+- Recebe mensagens do **WhatsApp (Evolution API)**.
+- Entende **o que você quer** (métricas de anúncios, suporte, vendas etc.).
+- Decide **qual módulo/fluxo ativar**, por exemplo:
+  - `meta_ads` → fluxo de métricas de anúncios (Meta Ads).
+  - `agente_suporte` → fluxo de suporte.
+  - `agente_vendas` → fluxo de vendas/planos.
+  - `oraculo_checkin` → conversa geral / check-in.
+- Mantém **memória da conversa** em banco (Postgres), para:
+  - saber o que foi perguntado antes;
+  - evitar decisões “burra” sem contexto;
+  - permitir futuros módulos de RAG, sessões, etc.
+
+Hoje o Oráculo é pensado **100% para uso interno** (você, Wellington, falando com ele pelo WhatsApp).
+
+---
+
+## 2. Objetivos do Oráculo
+
+1. **Ser seu copiloto de operação**, via WhatsApp:
+   - você fala em linguagem natural: “como estão os anúncios hoje?”, “ver anúncios de ontem”, “quero ver planos”.
+   - ele interpreta, confirma (quando necessário) e dispara o fluxo certo.
+
+2. **Padronizar a inteligência de roteamento**:
+   - separar o que é **IA (decisão)** do que é **execução (sub-fluxos)**;
+   - manter a IA “genérica” e os fluxos específicos (Meta Ads, suporte, vendas) em workflows separados.
+
+3. **Construir base para funis de vendas com IA**:
+   - o mesmo padrão pode ser usado para um **subfluxo vendedor**:
+     - topo de funil → descoberta;
+     - meio → educação / objeções;
+     - fundo → oferta / fechamento;
+   - sem inventar moda: baseado em padrões que o mercado já usa (assistentes, agentes, flows guiados).
+
+---
+
+## 3. Fluxo Alto Nível (do WhatsApp até o subfluxo)
+
+1. **Mensagem chega no WhatsApp → Evolution → Webhook**  
+   - Endpoint: `POST /webhook/oraculo-central` (exemplo).
+   - Nodo `🎯 Entrada WhatsApp` recebe o payload bruto da Evolution.
+
+2. **Validação básica**  
+   - Nodo `🔒 Validação` verifica se veio `instance`, `body`, etc.
+   - Se algo crítico estiver faltando, pode cair em fallback (no futuro).
+
+3. **Normalização dos dados**  
+   - Nodo `📄 Normalizar Dados` extrai:
+     - `telefone_whatsapp` (remoteJid).
+     - `telefone_cliente` (só números).
+     - `mensagem` (texto principal).
+     - `mensagem_atual`.
+     - `nome_cliente` (por enquanto fixo: “Wellington Júnior”).
+
+4. **Sessão (simulada)**  
+   - Nodo `🔍 Verificar Sessão (Simulada)`:
+     - gera um `sessionId` com base no telefone.
+     - marca `sessao_existente = false` (por enquanto sem lógica real de sessão).
+
+5. **Preparar contexto base**  
+   - Nodo `🎨 Prep Contexto` define:
+     - `canal = 'whatsapp'`
+     - `origem = 'usuario'`
+     - `tipo_mensagem = 'texto'`
+     - garante `mensagem_atual` preenchida.
+
+6. **Log de entrada no banco**  
+   - Nodo `🧾 Log Entrada Usuário` insere em `oraculo_logs`:
+     - `telefone_cliente`
+     - `origem = 'usuario'`
+     - `mensagem = mensagem_atual`.
+
+7. **Buscar histórico de conversa**  
+   - Nodo `🔎 Buscar Histórico Conversa`:
+     - `SELECT` dos últimos registros do mesmo `telefone_cliente`.
+     - limita, por exemplo, aos últimos 20 logs.
+
+8. **Montar histórico em texto**  
+   - Nodo `🧱 Montar Histórico p/ IA`:
+     - ordena por data;
+     - monta um texto estilo:
+       - `(usuário) boa tarde`
+       - `(oraculo) Pelo que entendi você quer olhar as métricas dos anúncios...`
+     - popula:
+       - `historico_conversa`
+       - `historico_formatado`.
+
+9. **Chamar Agente IA (LangChain + OpenAI)**  
+   - Nodo `🤖 Agente IA` recebe:
+     - `mensagem_atual`
+     - `historico_conversa`
+   - Prompt de sistema instrui a IA a devolver **apenas JSON** com:
+     - `agente_escolhido`
+     - `nivel_confianca`
+     - `justificativa`
+     - `resposta_texto`
+     - `observacoes_internas`
+     - `acao` (`conversar`, `confirmar`, `executar`)
+
+10. **Parser de decisão + regras fixas**  
+    - Nodo `📀 Parser Decisão`:
+      - faz parse do JSON vindo da IA.
+      - aplica regras extras:
+        - **Regra Meta Ads (confirmação):**
+          - se histórico contém pergunta de métricas (“métricas dos anúncios”, “quer que eu puxe os dados agora” etc.)
+          - e mensagem atual é uma confirmação curta (“sim”, “sim de agora”, “sim, de hoje” etc.)
+          - então força:
+            - `agente_escolhido = 'meta_ads'`
+            - `acao = 'executar'`
+        - **Regra palavra-chave Meta Ads:**
+          - se mensagem contém “anuncio”, “anúncios”, “meta ads”, “campanha”, “tráfego” etc.
+          - e IA veio com `oraculo_checkin`
+          - então ajusta:
+            - `agente_escolhido = 'meta_ads'`
+            - `acao = 'confirmar'` (se ainda não for “executar”)
+      - resolve também:
+        - saudação mais humana;
+        - mensagem final para WhatsApp;
+        - tipo de saída:
+          - `texto` → só responde;
+          - `webhook` → chama subfluxo (Meta Ads, etc.).
+
+11. **Log de saída no banco**  
+    - Nodo `🧾 Log Saída Oráculo` grava:
+      - `telefone_cliente`
+      - `origem = 'oraculo'`
+      - `mensagem` (o texto enviado para o WhatsApp)
+      - `agente_escolhido`
+      - `acao`
+      - `tipo_saida`
+      - `fluxo_destino` (URL do webhook, se tiver).
+
+12. **Switch: texto x webhook**  
+    - Nodo `Switch` olha `tipo_saida`:
+      - se `texto` → envia de volta pelo WhatsApp.
+      - se `webhook` → chama o subfluxo (ex.: Meta Ads Metrics).
+
+13. **Subfluxos**  
+    - Exemplo já implementado:
+      - `meta-ads-metrics`:
+        - pega dados da API Meta.
+        - monta:
+          - 1 mensagem resumo geral.
+          - 1 mensagem por campanha ativa.
+
+---
+
+## 4. Banco de Dados – Tabelas e Colunas
+
+### 4.1. Tabela `oraculo_logs`
+
+**Função:**  
+É a “caixa-preta” da conversa. Registra tudo que entra e sai do Oráculo por telefone.
+
+**Esquema sugerido (consolidando o que já usamos):**
+
+```sql
+CREATE TABLE oraculo_logs (
+  id              BIGSERIAL PRIMARY KEY,
+  criado_em       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  telefone_cliente TEXT NOT NULL,
+  origem           TEXT NOT NULL, -- 'usuario' ou 'oraculo'
+
+  mensagem         TEXT NOT NULL,
+
+  agente_escolhido TEXT,          -- meta_ads, agente_suporte, etc.
+  acao             TEXT,          -- conversar, confirmar, executar
+  tipo_saida       TEXT,          -- texto, webhook
+  fluxo_destino    TEXT           -- URL do webhook ou identificador do fluxo
+);

@@ -1,0 +1,195 @@
+{
+  "name": "🧪 Teste MCP Gateway - Produção",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual-trigger",
+      "name": "▶️ Iniciar Teste",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://gestorconecta-mcp-gateway.oxlser.easypanel.host/health",
+        "authentication": "none",
+        "options": {}
+      },
+      "id": "health-check",
+      "name": "❤️ Health Check",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [460, 100]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://gestorconecta-mcp-gateway.oxlser.easypanel.host/mcp/list",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Key",
+              "value": "camaleao-mcp-e6b9c9c7e8ef5dbdfc8e80331eac4c0c254fbf6ccd7065c4af3af05a8bdeed60"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "list-mcps",
+      "name": "📋 Listar MCPs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [460, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://gestorconecta-mcp-gateway.oxlser.easypanel.host/mcp/crm/espelho_bancario",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Key",
+              "value": "camaleao-mcp-e6b9c9c7e8ef5dbdfc8e80331eac4c0c254fbf6ccd7065c4af3af05a8bdeed60"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "periodo",
+              "value": "hoje"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "teste-hoje",
+      "name": "🔍 Teste: Hoje",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://gestorconecta-mcp-gateway.oxlser.easypanel.host/mcp/crm/espelho_bancario",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Key",
+              "value": "camaleao-mcp-e6b9c9c7e8ef5dbdfc8e80331eac4c0c254fbf6ccd7065c4af3af05a8bdeed60"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "periodo",
+              "value": "esta semana"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "teste-semana",
+      "name": "🔍 Teste: Esta Semana",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [460, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://gestorconecta-mcp-gateway.oxlser.easypanel.host/mcp/crm/espelho_bancario",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Key",
+              "value": "camaleao-mcp-e6b9c9c7e8ef5dbdfc8e80331eac4c0c254fbf6ccd7065c4af3af05a8bdeed60"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "periodo",
+              "value": "novembro"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "teste-novembro",
+      "name": "🔍 Teste: Novembro",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [460, 500]
+    }
+  ],
+  "connections": {
+    "▶️ Iniciar Teste": {
+      "main": [
+        [
+          {
+            "node": "❤️ Health Check",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "📋 Listar MCPs",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "🔍 Teste: Hoje",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "🔍 Teste: Esta Semana",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "🔍 Teste: Novembro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2025-12-16T20:30:00.000Z",
+  "versionId": "1"
+}

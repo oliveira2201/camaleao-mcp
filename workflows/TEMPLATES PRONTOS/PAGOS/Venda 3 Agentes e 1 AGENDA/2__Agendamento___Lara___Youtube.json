@@ -1,0 +1,442 @@
+{
+  "name": "2- Agendamento | Lara | Youtube",
+  "nodes": [
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "51bd4896-17e9-484b-b08a-b6854225ccb3",
+              "name": "response",
+              "value": "={{ $json.output }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        940,
+        80
+      ],
+      "id": "6645d7a5-edd6-48d2-a3c8-51c4b4512a33",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('setarInfo3').item.json.identificadorLead }}",
+        "contextWindowLength": 40
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "typeVersion": 1.3,
+      "position": [
+        240,
+        400
+      ],
+      "id": "2971db7c-f451-48b1-8a7d-df893f74a541",
+      "name": "Postgres Chat Memory",
+      "credentials": {
+        "postgres": {
+          "id": "6ZyqYAF7tGQrMHBP",
+          "name": "Postgres | Tabela teste"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4.1-mini"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        40,
+        400
+      ],
+      "id": "0400c46d-eaa7-45c8-adcf-e34ea227b7e5",
+      "name": "OpenAI Chat Model2",
+      "credentials": {
+        "openAiApi": {
+          "id": "LddDKTuP5h0yVWPU",
+          "name": "OpenAI | Afonso"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "",
+        "height": 600,
+        "width": 1580,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -280,
+        -20
+      ],
+      "typeVersion": 1,
+      "id": "a72f42ed-c4d3-464d-bce1-b7587bd80264",
+      "name": "Sticky Note5"
+    },
+    {
+      "parameters": {
+        "content": "## Agenda",
+        "height": 240,
+        "width": 720
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        520,
+        320
+      ],
+      "typeVersion": 1,
+      "id": "2e945b79-4381-4262-b342-6cb086bd8224",
+      "name": "Sticky Note12"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3058e999-b1bf-43f3-b95c-bf1d71157c51",
+              "name": "Duvida",
+              "value": "={{ $('When Executed by Another Workflow').item.json.duvida }}",
+              "type": "string"
+            },
+            {
+              "id": "c6e2e733-5bb4-4b3d-9a79-cf43a9e56458",
+              "name": "identificadorLead",
+              "value": "={{ $('When Executed by Another Workflow').item.json['Identificador Lead'] }}",
+              "type": "string"
+            },
+            {
+              "id": "2986dc61-de65-440b-846c-d36b4d60d75b",
+              "name": "resultado",
+              "value": "={{ $json.resultado }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        280,
+        80
+      ],
+      "id": "00b56c70-6665-43ba-80bc-83ba40f42d60",
+      "name": "setarInfo3"
+    },
+    {
+      "parameters": {
+        "name": "criar_reuniao",
+        "description": "=Use sempre para marcar uma consulta. Sempre coloque o horario de inicio (start) e o horario final (end), junto com a unidade que o usuário quer ser atendido.",
+        "workflowId": {
+          "__rl": true,
+          "value": "hu8HS3nPUEVA0FNJ",
+          "mode": "id"
+        },
+        "fields": {
+          "values": [
+            {
+              "name": "Evento",
+              "stringValue": "agendamento"
+            },
+            {
+              "name": "Remotejid",
+              "stringValue": "={{ $('setarInfo3').item.json.identificadorLead }}"
+            }
+          ]
+        },
+        "specifyInputSchema": true,
+        "jsonSchemaExample": "{\n    \"paciente\": \"nome do paciente\",\n    \"procedimento\": \"tipo de procedimento ou consulta\",\n    \"unidade\": \"unidade que o usuario vai ser atendido\",\n    \"start\": \"data e hora do inicio da reunião\",\n    \"end\": \"data e hora do fim da reunião\"\n}"
+      },
+      "id": "fe1e08ee-bec9-49d5-b556-d0b6a5a4ebb1",
+      "name": "criar_reuniao",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        620,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "name": "reagendar_reuniao",
+        "description": "=**Quando usar:**  \n- Use quando o paciente solicitar a **mudança de data ou horário** de uma consulta já marcada.\n- Consulte seu **histórico de conversa com o lead** para puxar o nome e o agendamento anterior.\n\n**Regras para uso:**  \n- Você já tem acesso ao histórico de conversas e agendamentos anteriores, então **não precisa pedir novamente** o nome e o horário anterior.\n\n**Quando não usar:**  \n- Se o paciente não tiver uma consulta previamente agendada.",
+        "workflowId": {
+          "__rl": true,
+          "value": "hu8HS3nPUEVA0FNJ",
+          "mode": "id"
+        },
+        "fields": {
+          "values": [
+            {
+              "name": "Evento",
+              "stringValue": "reagendamento"
+            },
+            {
+              "name": "Remotejid",
+              "stringValue": "={{ $('setarInfo3').item.json.identificadorLead }}"
+            }
+          ]
+        },
+        "specifyInputSchema": true,
+        "jsonSchemaExample": "{\n    \"paciente\": \"nome do paciente\",\n    \"start\": \"data e hora do início da reunião\",\n    \"end\": \"data e hora do fim da reunião\"\n}\n"
+      },
+      "id": "973b6f7d-e6c1-40c9-8626-34abccffe3c1",
+      "name": "reagendar_reuniao",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        940,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "name": "cancelar_reuniao",
+        "description": "=**Quando usar:**  \n- Use quando o paciente solicitar o **cancelamento** de uma consulta já agendada.\n\n**Regras para uso:**  \n- Você já tem acesso ao histórico de conversas e agendamentos anteriores, então **não precisa pedir novamente** o nome ou o horário anterior.\n\n**Quando não usar:**  \n- Se não houver nenhuma consulta agendada com o paciente.\n- Se a solicitação for apenas uma dúvida ou pergunta genérica sem intenção de cancelar.",
+        "workflowId": {
+          "__rl": true,
+          "value": "hu8HS3nPUEVA0FNJ",
+          "mode": "id"
+        },
+        "fields": {
+          "values": [
+            {
+              "name": "Evento",
+              "stringValue": "cancelamento"
+            },
+            {
+              "name": "Remotejid",
+              "stringValue": "={{ $('setarInfo3').item.json.identificadorLead }}"
+            }
+          ]
+        },
+        "specifyInputSchema": true,
+        "jsonSchemaExample": "{\n    \"paciente\": \"nome do paciente\"\n}\n"
+      },
+      "id": "106e1746-4f34-4eca-aca8-70cc3b37a460",
+      "name": "cancelar_reuniao",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1100,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "name": "ver_horarios",
+        "description": "=**Quando usar:**  \n- Use para buscar dias e horários disponíveis para agendamento.",
+        "workflowId": {
+          "__rl": true,
+          "value": "hu8HS3nPUEVA0FNJ",
+          "mode": "id"
+        },
+        "fields": {
+          "values": [
+            {
+              "name": "Evento",
+              "stringValue": "VerHorarios"
+            }
+          ]
+        },
+        "jsonSchemaExample": ""
+      },
+      "id": "927ccdf7-3835-4e2d-a21d-c5c28179cda0",
+      "name": "ver_horarios",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        780,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.Duvida }}",
+        "options": {
+          "systemMessage": "=## IDENTIDADE\nVocê é um **agente interno** responsável exclusivamente por gerenciar a agenda da clinica.\n\n## FUNÇÃO\nSua função é **consultar, reservar, remarcar ou cancelar horários de consulta** conforme solicitado pela **secretária**, garantindo **disponibilidade correta e alinhada aos dias específicos da clinica.\n\n## TOOLS DISPONÍVEIS\nDurante o atendimento, você pode usar as seguintes tools internas.\n\n### 1. Nome da tool: `criar_reuniao`\n**Quando usar:**  \n- Sempre que precisar **marcar um procedimento** na agenda.  \n- Antes de chamar essa tool, é obrigatório ter:\n  1. O **nome completo** do paciente.\n  2. A **data e hora** desejada.\n  3. Procedimento que o paciente tem interesse.\n  4. Unidade escolhida.\n\n**Quando não usar:**  \n- Se ainda não tiver o nome completo do paciente.  \n- Se ainda não tiver a data e o horário desejado.\n- Se ainda não tiver o procedimento desejado.\n- Se ainda não tiver a unidade escolhida.\n\n#### Regras para marcar a consulta\nPara marcar qualquer procedimento utilizando a tool **`criar_reuniao`**, é obrigatório definir corretamente:  \n1. O **start** (início da consulta).  \n2. O **end** (fim da consulta).  \n\nO tempo de cada consulta varia de acordo com o tipo de procedimento:  \n- **Botox** → duração de **1 hora** (end = start + 1h)  \n- **Limpeza de Pele** → duração de **40 minutos** (end = start + 40min)  \n- **Hidratação de Pele** → duração de **40 minutos** (end = start + 40min)  \n- **Todos os outros procedimentos** → duração de **30 minutos** (end = start + 30min)  \n\nSempre calcule o horário final (**end**) com base na duração correspondente ao procedimento informado.  \nIsso garante que a agenda reflita corretamente o tempo necessário para cada atendimento.\n\n### 2. Nome da tool: `reagendar_reuniao`\n**Quando usar:**  \n- Use quando o paciente solicitar a **mudança de data ou horário** de uma consulta já marcada.\n- Consulte seu **histórico de conversa com o lead** para puxar o nome e o agendamento anterior.\n\n**Regras para uso:**  \n- Você já tem acesso ao histórico de conversas e agendamentos anteriores, então **não precisa pedir novamente** o nome e o horário anterior.\n\n**Quando não usar:**  \n- Se o paciente não tiver uma consulta previamente agendada.\n\n### 3. Nome da tool: `cancelar_reuniao`\n**Quando usar:**  \n- Use quando o paciente solicitar o **cancelamento** de uma consulta já agendada.\n\n**Regras para uso:**  \n- Você já tem acesso ao histórico de conversas e agendamentos anteriores, então **não precisa pedir novamente** o nome ou o horário anterior.\n\n**Quando não usar:**  \n- Se não houver nenhuma consulta agendada com o paciente.\n- Se a solicitação for apenas uma dúvida ou pergunta genérica sem intenção de cancelar.\n\n### 4. Nome da tool: `ver_horarios`\n**Quando usar:**  \n- Use para buscar dias e horários disponíveis para agendamento.\n\n## REGRAS GERAIS\n- Sempre que mencionar o horário de uma consulta, informe o **dia da semana** junto com a data (dia e mês) e hora, neste formato:  \n  Exemplo: \"Terça-feira, dia 18/05 as 14:00\"\n- Nunca informe o **ano**. Use apenas **dia e mês**.\n- Considere que a data atual é sempre essa: {{ $now }}\n- Caso o paciente insista em saber **os horários disponíveis**, apresente no máximo **seis opções**.\n\n## DATA E HORA ATUALIZADOS\nPara efeito de contexto durante as suas conversas segue a data e hora de hoje e os próximos dias:\n{{ $json.resultado }}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.8,
+      "position": [
+        540,
+        80
+      ],
+      "id": "0f1e4060-425d-435a-a5d3-734c91aa2bb9",
+      "name": "Agendar"
+    },
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "duvida"
+            },
+            {
+              "name": "Identificador Lead"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -200,
+        80
+      ],
+      "id": "131468e0-aae3-4561-bc90-830078437222",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "jsCode": "const days = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];\nconst now = new Date();   // <-- ESTA LINHA ESTAVA FALTANDO\nconst pad = (n) => String(n).padStart(2, '0');\n\nlet result = '';\n\nfor (let i = 1; i <= 10; i++) {\n  const future = new Date(now);\n  future.setDate(now.getDate() + i);\n\n  let label = '';\n\n  if (i === 1) {\n    label = `Amanhã é ${days[future.getDay()]} ${pad(future.getDate())}/${pad(future.getMonth() + 1)}/${String(future.getFullYear()).slice(2)}`;\n  } else if (i === 2) {\n    label = `Depois de amanhã é ${days[future.getDay()]} ${pad(future.getDate())}/${pad(future.getMonth() + 1)}/${String(future.getFullYear()).slice(2)}`;\n  } else {\n    label = `${days[future.getDay()]} será dia ${pad(future.getDate())}/${pad(future.getMonth() + 1)}/${String(future.getFullYear()).slice(2)}`;\n  }\n\n  result += `${label}\\n`;\n}\n\nreturn [\n  {\n    json: {\n      resultado: result.trim()\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        40,
+        80
+      ],
+      "id": "39629544-9ab8-4427-aed2-0841af81b109",
+      "name": "proximos_dias"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Postgres Chat Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Agendar",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Agendar",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "setarInfo3": {
+      "main": [
+        [
+          {
+            "node": "Agendar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "criar_reuniao": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agendar",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "reagendar_reuniao": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agendar",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "cancelar_reuniao": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agendar",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agendar": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ver_horarios": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agendar",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "proximos_dias",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "proximos_dias": {
+      "main": [
+        [
+          {
+            "node": "setarInfo3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "38a27997-f811-4121-a882-41b76043cb5d",
+  "meta": {
+    "instanceId": "33738330930e3881dd5571eca013f36ddf8aab20e4ea5c1f2ebaf4a2b4668ac6"
+  },
+  "id": "ou5wkkQEy0S0eMMX",
+  "tags": []
+}

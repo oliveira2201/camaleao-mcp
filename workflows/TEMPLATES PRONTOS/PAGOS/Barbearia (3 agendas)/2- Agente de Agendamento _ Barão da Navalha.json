@@ -1,0 +1,508 @@
+{
+  "name": "2- Agente de Agendamento | Barão da Navalha",
+  "nodes": [
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "51bd4896-17e9-484b-b08a-b6854225ccb3",
+              "name": "response",
+              "value": "={{ $json.output }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        992,
+        80
+      ],
+      "id": "4209eb25-0155-4223-a1b4-645604665f2b",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4.1-mini"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        96,
+        400
+      ],
+      "id": "dffa9c8e-60b8-42eb-8264-ad696871d623",
+      "name": "OpenAI Chat Model2",
+      "credentials": {
+        "openAiApi": {
+          "id": "LddDKTuP5h0yVWPU",
+          "name": "OpenAI | Afonso"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "",
+        "height": 600,
+        "width": 1580,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -240,
+        -16
+      ],
+      "typeVersion": 1,
+      "id": "6b0dbcf4-9f87-4820-b176-524ee6742af1",
+      "name": "Sticky Note5"
+    },
+    {
+      "parameters": {
+        "content": "## Agenda",
+        "height": 240,
+        "width": 720
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        576,
+        320
+      ],
+      "typeVersion": 1,
+      "id": "38adbaac-21fb-4402-9a21-616e2546937d",
+      "name": "Sticky Note12"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3058e999-b1bf-43f3-b95c-bf1d71157c51",
+              "name": "Duvida",
+              "value": "={{ $('When Executed by Another Workflow').item.json.duvida }}",
+              "type": "string"
+            },
+            {
+              "id": "c6e2e733-5bb4-4b3d-9a79-cf43a9e56458",
+              "name": "identificadorLead",
+              "value": "={{ $('When Executed by Another Workflow').item.json['Identificador Lead'] }}",
+              "type": "string"
+            },
+            {
+              "id": "9181a250-f2ad-402e-8bed-2bc4ec9720e6",
+              "name": "servico",
+              "value": "=Serviço: {{ $('When Executed by Another Workflow').item.json.servico }}",
+              "type": "string"
+            },
+            {
+              "id": "2063178c-5134-49ce-9d86-c3a4d1f4f23d",
+              "name": "Profissional",
+              "value": "=Profissional: {{ $('When Executed by Another Workflow').item.json.Profissional }}",
+              "type": "string"
+            },
+            {
+              "id": "2986dc61-de65-440b-846c-d36b4d60d75b",
+              "name": "resultado",
+              "value": "={{ $json.resultado }}",
+              "type": "string"
+            },
+            {
+              "id": "1e3d6c2e-8f93-4b4d-b604-f5f8064fde02",
+              "name": "nomeCliente",
+              "value": "=Nome do cliente: {{ $('When Executed by Another Workflow').item.json.nomeCliente }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        336,
+        80
+      ],
+      "id": "3e468b78-6658-4e5c-8250-dfc243e80ba6",
+      "name": "setarInfo3"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.Duvida }}\n\n\n{{ $json.nomeCliente }}\n{{ $json.servico }}\n{{ $json.Profissional }}",
+        "options": {
+          "systemMessage": "=## IDENTIDADE\n\nVocê é um **agente interno** responsável exclusivamente por gerenciar os agendamentos da **Barbearia Barão da Navalha**.  \nSeu papel é auxiliar no controle das agendas dos profissionais **Robson**, **Fred** e **João**, garantindo que os horários estejam corretos e dentro da disponibilidade informada.\n\n## SUA FUNÇÃO\n\n-   Verificar **disponibilidade de datas e horários** entre segunda e sábado, das **10h às 18h**.\n-   **Agendar, remarcar, cancelar ou verificar disponibilidade de data/horário** atendimentos conforme solicitado.\n-   Validar os **pré-requisitos obrigatórios** antes de confirmar qualquer agendamento: **nome completo**, **data/hora** e **serviço escolhido**.\n-   Sempre que o cliente **informar o nome do barbeiro**, o agendamento deve ser feito na **tool correspondente**:\n    -   Robson → `robsonTool`\n    -   Fred → `fredTool` \n    -   João → `joaoTool`\n-   Caso o cliente **não informe preferência de barbeiro**, acione **somente uma tool de um barbeiro** especifico e faça o agendamento.\n\n## DIAS E HORÁRIOS DISPONÍVEIS\n\n-   Os atendimentos da **Barbearia Barão da Navalha** ocorrem de **segunda a sábado**, das **10h às 18h**.\n-   Cada serviço tem duração de **30 minutos**.\n-   Se o cliente escolher **mais de um serviço**, o tempo total será calculado multiplicando **30 minutos** pela quantidade de serviços.\n-   Os agendamentos devem sempre respeitar a **ordem e disponibilidade real** de cada profissional.\n\n## TOOLS DISPONÍVEIS\n\n### 1. Tool: `robsonTool`\n\n**Quando usar:**\n-   Sempre que o cliente desejar atendimento com **Robson**.\n-   Ou quando **não houver preferência** e Robson estiver disponível.\n\n**Quando não usar:**\n-   Se o cliente tiver solicitado atendimento com outro profissional (Fred ou João).\n\n### 2. Tool: `fredTool`\n\n**Quando usar:**\n-   Sempre que o cliente desejar atendimento com **Fred**.\n-   Ou quando **não houver preferência** e Fred estiver disponível.\n\n**Quando não usar:**\n-   Se o cliente tiver solicitado atendimento com outro profissional (Robson ou João).\n\n### 3. Tool: `joaoTool`\n\n**Quando usar:**\n-   Sempre que o cliente desejar atendimento com **João**.\n-   Ou quando **não houver preferência** e João estiver disponível.\n\n**Quando não usar:**\n-   Se o cliente tiver solicitado atendimento com outro profissional (Robson ou Fred).\n\n## REGRAS GERAIS\n\n-   Sempre confirme se o cliente informou **nome completo**, **data**, **hora** e **serviço desejado** antes de efetuar o agendamento.\n-   **Nunca** acione a tool de agendamento sem ter essas informações.\n-   Caso o cliente **não mencione o barbeiro**, escolha **uma das três tools** disponíveis e faça o agendamento.\n-   Nunca faça o mesmo agendamento nas três tools dos barbeiros.   \n-   Mencione sempre o **dia da semana** junto com a **data e hora** no formato:\n    - “Sexta-feira, dia 22/11, às 15h.”\n\n-   **Não inclua o ano** em nenhuma data.\n-   Se o cliente quiser saber horários livres, apresente **no máximo quatro opções**.\n-   Todos os atendimentos devem respeitar o horário de funcionamento: **segunda a sábado, das 10h às 18h**.\n-   A duração padrão é de **30 minutos por serviço**, somando o tempo proporcional caso o cliente escolha mais de um.\n-   Nenhum pagamento ou sinal é exigido para confirmar o agendamento.\n\n## DATA E HORA ATUALIZADOS\n\nUse estas informações como contexto de data e hora nas conversas:  \n{{ $json.resultado }}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.8,
+      "position": [
+        592,
+        80
+      ],
+      "id": "f0922e72-b952-47fc-9e5b-a05f17061239",
+      "name": "Agendar"
+    },
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "duvida"
+            },
+            {
+              "name": "Identificador Lead"
+            },
+            {
+              "name": "Profissional"
+            },
+            {
+              "name": "servico"
+            },
+            {
+              "name": "nomeCliente"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -160,
+        80
+      ],
+      "id": "3aa7f5c1-1b35-4736-ad7f-47120e30bfb7",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "jsCode": "const days = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];\nconst now = new Date();   // <-- ESTA LINHA ESTAVA FALTANDO\nconst pad = (n) => String(n).padStart(2, '0');\n\nlet result = '';\n\nfor (let i = 1; i <= 10; i++) {\n  const future = new Date(now);\n  future.setDate(now.getDate() + i);\n\n  let label = '';\n\n  if (i === 1) {\n    label = `Amanhã é ${days[future.getDay()]} ${pad(future.getDate())}/${pad(future.getMonth() + 1)}/${String(future.getFullYear()).slice(2)}`;\n  } else if (i === 2) {\n    label = `Depois de amanhã é ${days[future.getDay()]} ${pad(future.getDate())}/${pad(future.getMonth() + 1)}/${String(future.getFullYear()).slice(2)}`;\n  } else {\n    label = `${days[future.getDay()]} será dia ${pad(future.getDate())}/${pad(future.getMonth() + 1)}/${String(future.getFullYear()).slice(2)}`;\n  }\n\n  result += `${label}\\n`;\n}\n\nreturn [\n  {\n    json: {\n      resultado: result.trim()\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        96,
+        80
+      ],
+      "id": "069cab1b-25ff-4dd5-82ec-1ab9cce791dc",
+      "name": "proximos_dias"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "iJWBTDdfI4y6TXKr",
+          "mode": "id",
+          "cachedResultUrl": "/workflow/iJWBTDdfI4y6TXKr"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Identificador Lead": "={{ $('setarInfo3').item.json.identificadorLead }}",
+            "duvida": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('duvida', `Coloque aqui a intenção que o paciente deseja (ver horários, marcar, cancelar ou reagendar). Seja explicativo e se possível sempre coloque o nome do paciente.`, 'string') }}",
+            "servico": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('servico', `Aqui você deve colocar o serviço que o cliente deseja fazer. Caso ele queira fazer mais de um serviço, coloque o nome de todos.`, 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "duvida",
+              "displayName": "duvida",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "Identificador Lead",
+              "displayName": "Identificador Lead",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "servico",
+              "displayName": "servico",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        720,
+        416
+      ],
+      "id": "538c5a97-9e27-4537-b0b6-f4eb20838b03",
+      "name": "robsonTool"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "2dX0ktzu0JInjEIV",
+          "mode": "id",
+          "cachedResultUrl": "/workflow/2dX0ktzu0JInjEIV"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Identificador Lead": "={{ $('setarInfo3').item.json.identificadorLead }}",
+            "servico": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('servico', `Aqui você deve colocar o serviço que o cliente deseja fazer. Caso ele queira fazer mais de um serviço, coloque o nome de todos.`, 'string') }}",
+            "duvida": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('duvida', `Coloque aqui a intenção que o paciente deseja (ver horários, marcar, cancelar ou reagendar). Seja explicativo e se possível sempre coloque o nome do paciente.`, 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "duvida",
+              "displayName": "duvida",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "Identificador Lead",
+              "displayName": "Identificador Lead",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "servico",
+              "displayName": "servico",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        864,
+        416
+      ],
+      "id": "1644ef96-438b-480d-9164-54931e0e7226",
+      "name": "fredTool"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "CQcwfmfrKyffFuQd",
+          "mode": "id",
+          "cachedResultUrl": "/workflow/CQcwfmfrKyffFuQd"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Identificador Lead": "={{ $('setarInfo3').item.json.identificadorLead }}",
+            "servico": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('servico', `Aqui você deve colocar o serviço que o cliente deseja fazer. Caso ele queira fazer mais de um serviço, coloque o nome de todos.`, 'string') }}",
+            "duvida": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('duvida', `Coloque aqui a intenção que o paciente deseja (ver horários, marcar, cancelar ou reagendar). Seja explicativo e se possível sempre coloque o nome do paciente.`, 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "duvida",
+              "displayName": "duvida",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "Identificador Lead",
+              "displayName": "Identificador Lead",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "servico",
+              "displayName": "servico",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        1024,
+        416
+      ],
+      "id": "1df9e1ce-5cdc-4543-afd7-6ca873b17f5f",
+      "name": "joaoTool"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('setarInfo3').item.json.identificadorLead }}",
+        "contextWindowLength": 40
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "typeVersion": 1.3,
+      "position": [
+        272,
+        400
+      ],
+      "id": "12e2f51e-28ad-4928-83c9-96d76435848f",
+      "name": "Memoria",
+      "credentials": {
+        "postgres": {
+          "id": "6ZyqYAF7tGQrMHBP",
+          "name": "Postgres | Tabela teste"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "OpenAI Chat Model2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Agendar",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "setarInfo3": {
+      "main": [
+        [
+          {
+            "node": "Agendar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agendar": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "proximos_dias",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "proximos_dias": {
+      "main": [
+        [
+          {
+            "node": "setarInfo3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "robsonTool": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agendar",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "fredTool": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agendar",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "joaoTool": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agendar",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Memoria": {
+      "ai_memory": [
+        [
+          {
+            "node": "Agendar",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "8ea61b1a-f7e3-4b02-9f61-3f4b2564390e",
+  "meta": {
+    "instanceId": "33738330930e3881dd5571eca013f36ddf8aab20e4ea5c1f2ebaf4a2b4668ac6"
+  },
+  "id": "bM7BxTeNwxjMuTDA",
+  "tags": []
+}

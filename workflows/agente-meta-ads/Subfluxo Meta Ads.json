@@ -1,0 +1,217 @@
+{
+  "name": "Subfluxo Meta Ads",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "meta-ads-metrics",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "95fbb11c-4632-4413-be15-7d91e07f3ecf",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [
+        -176,
+        16
+      ],
+      "webhookId": "meta-ads-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 🔧 CONVERTER PERÍODO PARA DATAS 12/12 09:57\n// ═════════════════════════════════════════════════════\n\nconst items = $input.all();\n\nreturn items.map(function(item) {\n  const periodoRaw = (item.json.periodo || '').toString().toLowerCase().trim();\n\n  console.log('🔍 DEBUG - Período recebido:', periodoRaw);\n\n  // ═══════════════════════════════════════════════════\n  // 1. OBTER DATA ATUAL NO FUSO HORÁRIO DO BRASIL\n  // ═══════════════════════════════════════════════════\n\n  // Pega a data/hora atual no horário de Brasília\n  const agora = new Date();\n  const brasiliaStr = agora.toLocaleString('en-US', {\n    timeZone: 'America/Sao_Paulo',\n    year: 'numeric',\n    month: '2-digit',\n    day: '2-digit'\n  });\n\n  // Parse: formato \"MM/DD/YYYY\"\n  const [mesStr, diaStr, anoStr] = brasiliaStr.split('/');\n  const hoje = new Date(parseInt(anoStr), parseInt(mesStr) - 1, parseInt(diaStr));\n\n  console.log('📅 DEBUG - Hoje (Brasília):', `${diaStr}/${mesStr}/${anoStr}`);\n\n  // ═══════════════════════════════════════════════════\n  // 2. HELPER FUNCTIONS\n  // ═══════════════════════════════════════════════════\n\n  // Formatar para YYYY-MM-DD (padrão Facebook)\n  const formatar = (d) => {\n    const ano = d.getFullYear();\n    const mes = String(d.getMonth() + 1).padStart(2, '0');\n    const dia = String(d.getDate()).padStart(2, '0');\n    return `${ano}-${mes}-${dia}`;\n  };\n\n  // Subtrair dias\n  const subtrairDias = (data, dias) => {\n    const d = new Date(data);\n    d.setDate(d.getDate() - dias);\n    return d;\n  };\n\n  // ═══════════════════════════════════════════════════\n  // 3. VARIÁVEIS DE DATA\n  // ═══════════════════════════════════Q════════════════\n\n  let dataInicial = new Date(hoje);\n  let dataFinal = new Date(hoje);\n  let periodoLabel = 'hoje';\n\n  // ═══════════════════════════════════════════════════\n  // 4. LÓGICA DE PERÍODOS\n  // ═══════════════════════════════════════════════════\n\n  // 1. ONTEM\n  if (periodoRaw.includes('ontem') || periodoRaw.includes('yesterday')) {\n    dataInicial = subtrairDias(hoje, 1);\n    dataFinal = subtrairDias(hoje, 1);\n    periodoLabel = 'ontem';\n    console.log('✅ Período: ONTEM');\n  }\n\n  // 2. ÚLTIMOS 7 DIAS\n  else if (periodoRaw.includes('7') || periodoRaw.includes('semana')) {\n    dataInicial = subtrairDias(hoje, 6);\n    dataFinal = hoje;\n    periodoLabel = 'últimos 7 dias';\n    console.log('✅ Período: ÚLTIMOS 7 DIAS');\n  }\n\n  // 3. ÚLTIMOS 30 DIAS\n  else if (periodoRaw.includes('30')) {\n    dataInicial = subtrairDias(hoje, 29);\n    dataFinal = hoje;\n    periodoLabel = 'últimos 30 dias';\n    console.log('✅ Período: ÚLTIMOS 30 DIAS');\n  }\n\n  // 4. MÊS PASSADO\n  else if (periodoRaw.includes('passado') && (periodoRaw.includes('mes') || periodoRaw.includes('mês'))) {\n    dataInicial = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);\n    dataFinal = new Date(hoje.getFullYear(), hoje.getMonth(), 0);\n    periodoLabel = 'mês passado';\n    console.log('✅ Período: MÊS PASSADO');\n  }\n\n  // 5. ESTE MÊS / MÊS ATUAL\n  else if ((periodoRaw.includes('atual') || periodoRaw.includes('este') || periodoRaw.includes('esse')) && (periodoRaw.includes('mes') || periodoRaw.includes('mês'))) {\n    dataInicial = new Date(hoje.getFullYear(), hoje.getMonth(), 1);\n    dataFinal = hoje;\n    periodoLabel = 'este mês';\n    console.log('✅ Período: ESTE MÊS');\n  }\n\n  // 6. PADRÃO: HOJE\n  else {\n    dataInicial = hoje;\n    dataFinal = hoje;\n    periodoLabel = 'hoje';\n    console.log('✅ Período: HOJE (padrão)');\n  }\n\n  // ═══════════════════════════════════════════════════\n  // 5. OUTPUT FORMATADO\n  // ═══════════════════════════════════════════════════\n\n  const dataInicialStr = formatar(dataInicial);\n  const dataFinalStr = formatar(dataFinal);\n\n  console.log('📤 DEBUG - Output:');\n  console.log('   - Data Inicial:', dataInicialStr, `(${dataInicial.getDate()}/${dataInicial.getMonth() + 1}/${dataInicial.getFullYear()})`);\n  console.log('   - Data Final:', dataFinalStr, `(${dataFinal.getDate()}/${dataFinal.getMonth() + 1}/${dataFinal.getFullYear()})`);\n  console.log('   - Label:', periodoLabel);\n\n  return {\n    json: {\n      periodo_original: periodoRaw,\n      periodo_label: periodoLabel,\n      data_inicial: dataInicialStr,\n      data_final: dataFinalStr,\n\n      // Debug extra\n      _debug: {\n        hoje_brasilia: formatar(hoje),\n        data_inicial_legivel: `${dataInicial.getDate()}/${dataInicial.getMonth() + 1}/${dataInicial.getFullYear()}`,\n        data_final_legivel: `${dataFinal.getDate()}/${dataFinal.getMonth() + 1}/${dataFinal.getFullYear()}`\n      }\n    }\n  };\n});\n"
+      },
+      "id": "d2b666e9-ee83-4b75-90f1-a437dbe18be7",
+      "name": "Converter Período",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        64,
+        -96
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://graph.facebook.com/v19.0/act_298916719612501/insights",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "level",
+              "value": "campaign"
+            },
+            {
+              "name": "fields",
+              "value": "campaign_name,spend,impressions,clicks,cpc,ctr,cpm,actions,action_values,cost_per_action_type,reach,frequency"
+            },
+            {
+              "name": "access_token",
+              "value": "EAAct409U8ewBQLgZBvN9TvwRwBXYCYj5jG45KqqpYBAk7I4zqC8iRHqNylyYZCSL63QJdmXaliO4s50ouqFNXgIUenARiPuoeHyo6baOZAK4zK3AREiQAHQUsxQu2y75jgsDb5JG2gmpRDjclIVHo4U7ueR2tfnBKoBDNUN36LJNY6WVOMnpZA5sVwujmCRhkbeEQZCdv6JHidUIt"
+            },
+            {
+              "name": "filtering",
+              "value": "[{\"field\":\"spend\",\"operator\":\"GREATER_THAN\",\"value\":0}]"
+            },
+            {
+              "name": "time_range",
+              "value": "={\"since\":\"{{ $json.data_inicial }}\",\"until\":\"{{ $json.data_final }}\"}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1ba3ba3e-459d-4c15-8472-2def9080b989",
+      "name": "Consultar Meta Ads API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        304,
+        -96
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "O8mtYJM1fzWJozku",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 📊 PROCESSAR E ESTRUTURAR DADOS DO META ADS\n// ════════════════════════════════════════════════════════\n\nconst respostaAPI = $input.first().json;\n\n// 🔧 CORREÇÃO: Usa .first() para garantir que pega a data do nó Converter Período\n// independente de quantas campanhas a API retornou.\nconst periodoInput = $('Converter Período').first().json; \n\ntry {\n  // Verifica se a API retornou dados\n  if (!respostaAPI.data || respostaAPI.data.length === 0) {\n    return {\n      json: {\n        tem_dados: false,\n        num_campanhas: 0,\n        periodo_original: periodoInput.periodo_original || 'hoje',\n        periodo_label: periodoInput.periodo_label || 'hoje',\n        data_inicial: periodoInput.data_inicial,\n        data_final: periodoInput.data_final,\n        timestamp: new Date().toISOString()\n      }\n    };\n  }\n  \n  // ════════════════════════════════════════════════════\n  // INICIALIZAR TOTAIS GERAIS\n  // ════════════════════════════════════════════════════\n  \n  let totalGasto = 0;\n  let totalImpressoes = 0;\n  let totalCliques = 0;\n  let totalAlcance = 0;\n  let totalFrequencia = 0;\n  let totalCompras = 0;\n  let totalValorCompras = 0;\n  \n  const campanhasProcessadas = [];\n  \n  // ════════════════════════════════════════════════════\n  // PROCESSAR CADA CAMPANHA\n  // ════════════════════════════════════════════════════\n  \n  for (const campanha of respostaAPI.data) {\n    const gasto = parseFloat(campanha.spend || 0);\n    const impressoes = parseInt(campanha.impressions || 0);\n    const cliques = parseInt(campanha.clicks || 0);\n    const alcance = parseInt(campanha.reach || 0);\n    const frequencia = parseFloat(campanha.frequency || 0);\n    const cpc = parseFloat(campanha.cpc || 0);\n    const ctr = parseFloat(campanha.ctr || 0);\n    const cpm = parseFloat(campanha.cpm || 0);\n    \n    // Buscar conversões\n    let comprasCampanha = 0;\n    let valorComprasCampanha = 0;\n    let custoCompraCampanha = 0;\n    \n    if (campanha.actions) {\n      for (const action of campanha.actions) {\n        if (action.action_type === 'purchase' || action.action_type === 'omni_purchase') {\n          comprasCampanha += parseInt(action.value || 0);\n        }\n      }\n    }\n    \n    if (campanha.action_values) {\n      for (const actionValue of campanha.action_values) {\n        if (actionValue.action_type === 'purchase' || actionValue.action_type === 'omni_purchase') {\n          valorComprasCampanha += parseFloat(actionValue.value || 0);\n        }\n      }\n    }\n    \n    if (campanha.cost_per_action_type) {\n      for (const costAction of campanha.cost_per_action_type) {\n        if (costAction.action_type === 'purchase' || costAction.action_type === 'omni_purchase') {\n          custoCompraCampanha = parseFloat(costAction.value || 0);\n        }\n      }\n    }\n    \n    const roasCampanha = gasto > 0 ? (valorComprasCampanha / gasto) : 0;\n    \n    // Adicionar aos totais\n    totalGasto += gasto;\n    totalImpressoes += impressoes;\n    totalCliques += cliques;\n    totalAlcance += alcance;\n    totalFrequencia += frequencia;\n    totalCompras += comprasCampanha;\n    totalValorCompras += valorComprasCampanha;\n    \n    campanhasProcessadas.push({\n      nome: campanha.campaign_name || 'Sem nome',\n      gasto: gasto,\n      impressoes: impressoes,\n      cliques: cliques,\n      alcance: alcance,\n      frequencia: frequencia,\n      ctr: ctr,\n      cpc: cpc,\n      cpm: cpm,\n      compras: comprasCampanha,\n      valor_compras: valorComprasCampanha,\n      custo_compra: custoCompraCampanha || (comprasCampanha > 0 ? gasto / comprasCampanha : 0),\n      roas: roasCampanha,\n      tem_conversoes: comprasCampanha > 0\n    });\n  }\n  \n  // ════════════════════════════════════════════════════\n  // CALCULAR MÉDIAS\n  // ════════════════════════════════════════════════════\n  \n  const numCampanhas = campanhasProcessadas.length;\n  const ctrGeral = totalImpressoes > 0 ? (totalCliques / totalImpressoes * 100) : 0;\n  const cpcGeral = totalCliques > 0 ? (totalGasto / totalCliques) : 0;\n  const cpmGeral = totalImpressoes > 0 ? (totalGasto / totalImpressoes * 1000) : 0;\n  const custoCompraGeral = totalCompras > 0 ? (totalGasto / totalCompras) : 0;\n  const roasGeral = totalGasto > 0 ? (totalValorCompras / totalGasto) : 0;\n  const frequenciaMedia = numCampanhas > 0 ? (totalFrequencia / numCampanhas) : 0;\n  \n  // ════════════════════════════════════════════════════\n  // RETURN\n  // ════════════════════════════════════════════════════\n  \n  return {\n    json: {\n      tem_dados: true,\n      periodo_original: periodoInput.periodo_original || 'hoje',\n      periodo_label: periodoInput.periodo_label || 'hoje',\n      data_inicial: periodoInput.data_inicial, // Agora vai funcionar com .first()\n      data_final: periodoInput.data_final,     \n      num_campanhas: numCampanhas,\n      \n      totais: {\n        gasto: totalGasto,\n        impressoes: totalImpressoes,\n        cliques: totalCliques,\n        alcance: totalAlcance,\n        frequencia_media: frequenciaMedia,\n        ctr: ctrGeral,\n        cpc: cpcGeral,\n        cpm: cpmGeral,\n        compras: totalCompras,\n        valor_compras: totalValorCompras,\n        custo_compra: custoCompraGeral,\n        roas: roasGeral,\n        tem_conversoes: totalCompras > 0\n      },\n      \n      campanhas: campanhasProcessadas,\n      timestamp: new Date().toISOString()\n    }\n  };\n  \n} catch (error) {\n  console.error('Erro ao processar dados:', error);\n  return {\n    json: {\n      tem_dados: false,\n      erro: true,\n      mensagem_erro: error.message,\n      // Fallback para evitar erro undefined\n      periodo_label: periodoInput ? periodoInput.periodo_label : 'erro' \n    }\n  };\n}"
+      },
+      "id": "903b122d-8df0-406a-a520-1b7fc9a75827",
+      "name": "Processar Métricas",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        528,
+        -96
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "=Se não tiver a opção \"Text\" explicita, procure por \"Raw\" ou certifique-se de que o corpo seja um JSON válido envolvendo o texto, mas a opção \"Text\" deve existir.",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "71822bd4-d2b0-4b91-86be-b7239adb65c3",
+      "name": "Responder Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        992,
+        -96
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// 📱 FORMATAR SAÍDA COM SEPARADOR\n// O Subfluxo apenas prepara o texto. Quem envia é o Oráculo.\n\nconst dadosProcessados = $input.first().json;\n\n// Helpers\nfunction formatarNumero(valor) { return valor.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 }); }\nfunction formatarDinheiro(valor) { return 'R$ ' + valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }\nfunction formatarPercentual(valor) { return valor.toFixed(2) + '%'; }\nfunction formatarDataBR(dataAmericana) {\n  if (!dataAmericana) return '';\n  const partes = dataAmericana.split('-');\n  if (partes.length !== 3) return dataAmericana;\n  return `${partes[2]}/${partes[1]}/${partes[0]}`;\n}\n\nconst mensagens = [];\n\ntry {\n  if (!dadosProcessados.tem_dados) {\n    mensagens.push(`📊 *Métricas Meta Ads*\\n\\n⚠️ Não encontrei campanhas com gasto no período solicitado.`);\n  } else {\n    const t = dadosProcessados.totais;\n    const dInicio = formatarDataBR(dadosProcessados.data_inicial);\n    const dFim = formatarDataBR(dadosProcessados.data_final);\n    let labelPeriodo = dadosProcessados.periodo_label || 'hoje';\n\n    if (dInicio && dFim) {\n      if (dInicio === dFim) { labelPeriodo += ` (${dInicio})`; } \n      else { labelPeriodo += ` (${dInicio} até ${dFim})`; }\n    }\n\n    // ── 1. RESUMO GERAL\n    const linhasResumo = [];\n    linhasResumo.push('📊 *RESUMO GERAL – Meta Ads*');\n    linhasResumo.push('━━━━━━━━━━━━━━━━━━━━');\n    linhasResumo.push(`📅 *Período:* ${labelPeriodo}`);\n    linhasResumo.push(`🎯 *Campanhas com gasto:* ${dadosProcessados.num_campanhas}`);\n    linhasResumo.push('');\n    linhasResumo.push(`💰 *Total:* ${formatarDinheiro(t.gasto)}`);\n    linhasResumo.push(`• 👁️ Impressões: ${formatarNumero(t.impressoes)}`);\n    linhasResumo.push(`• 🖱️ Cliques: ${formatarNumero(t.cliques)}`);\n    linhasResumo.push(`• 📊 CTR: ${formatarPercentual(t.ctr)}`);\n    linhasResumo.push(`• 💵 CPC: ${formatarDinheiro(t.cpc)}`);\n\n    if (t.tem_conversoes) {\n      linhasResumo.push('');\n      linhasResumo.push(`🛒 *Conversões:* ${t.compras}`);\n      linhasResumo.push(`• ROAS: ${t.roas.toFixed(2)}x`);\n      linhasResumo.push(`• Custo/Compra: ${formatarDinheiro(t.custo_compra)}`);\n    }\n    mensagens.push(linhasResumo.join('\\n'));\n\n    // ── 2. CAMPANHAS INDIVIDUAIS\n    const campanhas = [...dadosProcessados.campanhas].sort((a, b) => (b.gasto || 0) - (a.gasto || 0));\n    const LIMITE = 5;\n    \n    campanhas.slice(0, LIMITE).forEach((camp, index) => {\n      const linhasCamp = [];\n      if (index === 0) linhasCamp.push('🏆 *TOP CAMPANHA*');\n      linhasCamp.push(`📌 *${camp.nome}*`);\n      linhasCamp.push(`💰 ${formatarDinheiro(camp.gasto)}`);\n      linhasCamp.push(`• CPC: ${formatarDinheiro(camp.cpc)} | CTR: ${formatarPercentual(camp.ctr)}`);\n      if (camp.tem_conversoes) {\n        linhasCamp.push(`• ${camp.compras} compras (ROAS ${camp.roas.toFixed(2)})`);\n      }\n      mensagens.push(linhasCamp.join('\\n'));\n    });\n    \n    if (campanhas.length > LIMITE) {\n      mensagens.push(`_...e mais ${campanhas.length - LIMITE} campanhas menores._`);\n    }\n  }\n} catch (error) {\n  mensagens.push(`Erro ao formatar: ${error.message}`);\n}\n\n// 🔧 O SEGREDO: Juntar tudo com um separador único \"|||\"\n// O Agente vai receber isso como um texto só, e nós cortamos depois.\nreturn {\n  json: {\n    // Retorna string única com separadores\n    output: mensagens.join('\\n\\n|||\\n\\n') \n  }\n};"
+      },
+      "id": "04510cb7-7000-40c9-a8a6-7abab839f331",
+      "name": "Formatar Metricas",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        752,
+        -96
+      ]
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -192,
+        -176
+      ],
+      "id": "2493293c-c361-4889-bf7b-fbf9533ffac2",
+      "name": "When Executed by Another Workflow"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Converter Período",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Converter Período": {
+      "main": [
+        [
+          {
+            "node": "Consultar Meta Ads API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultar Meta Ads API": {
+      "main": [
+        [
+          {
+            "node": "Processar Métricas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Processar Métricas": {
+      "main": [
+        [
+          {
+            "node": "Formatar Metricas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formatar Metricas": {
+      "main": [
+        [
+          {
+            "node": "Responder Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Converter Período",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "e752951b-79ac-4481-a8b3-e96794430ef0",
+  "meta": {
+    "instanceId": "f531fb252dbf40665fefaa3181beaeea61ace3a35a4d3addc3ce931c6136823a"
+  },
+  "id": "e4BoOTDTUWtu89WI",
+  "tags": []
+}

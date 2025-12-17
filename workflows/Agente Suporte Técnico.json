@@ -1,0 +1,184 @@
+{
+  "name": "Agente Suporte Técnico",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "suporte",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "86d84f9a-5fcd-4db2-adbb-47c61d80edf8",
+      "name": "Entrada Suporte",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [
+        -688,
+        384
+      ],
+      "webhookId": "webhook-suporte"
+    },
+    {
+      "parameters": {
+        "jsCode": "const entrada = $input.first().json;\n\n// Esperado do Oráculo:\n// {\n//   telefone_cliente,\n//   nome_cliente,\n//   mensagem_usuario,\n//   historico_conversa (opcional),\n//   contexto_extra (opcional)\n// }\n\nconst telefone = entrada.telefone_cliente || entrada.telefone || \"\";\nconst nome = entrada.nome_cliente || \"Cliente\";\nconst mensagem = entrada.mensagem_usuario || entrada.mensagem || \"\";\nconst historico = entrada.historico_conversa || [];\nconst contextoExtra = entrada.contexto_extra || {};\n\n// Monta um contexto condensado para o prompt\nconst historicoFormatado = historico\n  .slice(-6)\n  .map((msg) => `(${msg.origem || 'user'}) ${msg.texto}`)\n  .join(\"\\n\");\n\nconst promptSistema = `Você é um assistente de suporte técnico do ecossistema GestorConecta.\nSeu objetivo é ajudar o usuário de maneira objetiva, educada e clara.\n\nRegras importantes:\n- Responda SEMPRE em português do Brasil.\n- Seja direto, mas cordial.\n- Se precisar pedir mais informações, pergunte de forma clara e em poucas linhas.\n- Se o problema for técnico demais, explique em linguagem simples.\n- Evite respostas muito longas. Priorize clareza e praticidade.\n- Se for uma dúvida sobre GestorConecta, tente explicar o passo a passo.\n`;\n\nlet promptUsuario = `Nome do cliente: ${nome}\nTelefone: ${telefone}\nMensagem atual: ${mensagem}`;\n\nif (historicoFormatado) {\n  promptUsuario += `\\n\\nHistórico recente de conversa:\\n${historicoFormatado}`;\n}\n\nif (Object.keys(contextoExtra).length > 0) {\n  promptUsuario += `\\n\\nContexto extra fornecido pelo sistema:\\n${JSON.stringify(contextoExtra, null, 2)}`;\n}\n\nreturn {\n  json: {\n    telefone_cliente: telefone,\n    nome_cliente: nome,\n    mensagem_usuario: mensagem,\n    prompt_sistema: promptSistema,\n    prompt_usuario: promptUsuario\n  }\n};"
+      },
+      "id": "63e3dfaf-7493-4ac1-ba90-945838f09690",
+      "name": "Preparar Contexto + Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -448,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "=={{ \n  {\n    \"model\": \"gpt-4o-mini\",\n    \"messages\": [\n      {\n        \"role\": \"system\",\n        \"content\": $json[\"prompt_sistema\"]\n      },\n      {\n        \"role\": \"user\",\n        \"content\": $json[\"prompt_usuario\"]\n      }\n    ],\n    \"temperature\": 0.4,\n    \"max_tokens\": 1000\n  } \n}}\n",
+        "options": {}
+      },
+      "id": "9c80c4e7-dd08-4d4a-83f1-85f6745274ac",
+      "name": "Chamar OpenAI",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -208,
+        384
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "R96FVVEXWjB7bOTf",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const respostaOpenAI = $input.first().json;\nconst contexto = $('Preparar Contexto + Prompt').first().json;\n\n// OpenAI retorna algo como:\n// { choices: [ { message: { content: \"...\" } } ], ... }\n\nlet mensagemIA = 'Ops, não consegui gerar uma resposta agora. Tente novamente em alguns instantes.';\n\ntry {\n  const choice = respostaOpenAI.choices?.[0];\n  const content = choice?.message?.content;\n  if (content) {\n    mensagemIA = content.trim();\n  }\n} catch (error) {\n  console.log('Erro ao ler resposta da IA:', error.message);\n}\n\nreturn {\n  json: {\n    telefone_destino: contexto.telefone_cliente,\n    mensagem_resposta: mensagemIA,\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "id": "815e812e-c4b4-48df-ab96-b51b80c6af8e",
+      "name": "Processar Resposta IA",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        48,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://evolution.gestorconecta.com.br/message/sendText/oraculo",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "SUA_APIKEY_AQUI"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "number",
+              "value": "={{ $json.telefone_destino }}"
+            },
+            {
+              "name": "text",
+              "value": "🛠️ *Suporte Técnico*\n\n{{ $json.mensagem_resposta }}\n\nQualquer dúvida é só responder!"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c012956e-edfb-4cf5-9f05-2a1e742b8ac7",
+      "name": "Enviar WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        288,
+        384
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\n  \"mensagem_resposta\": $json[\"mensagem_resposta\"],\n  \"telefone_destino\": $json[\"telefone_destino\"],\n  \"sucesso\": true,\n  \"agente\": \"suporte\",\n  \"timestamp\": $json[\"timestamp\"]\n} }}",
+        "options": {}
+      },
+      "id": "7a2c801d-6b5b-45a5-9ea8-cf29548f74b7",
+      "name": "Responder Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        528,
+        384
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Entrada Suporte": {
+      "main": [
+        [
+          {
+            "node": "Preparar Contexto + Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Contexto + Prompt": {
+      "main": [
+        [
+          {
+            "node": "Chamar OpenAI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chamar OpenAI": {
+      "main": [
+        [
+          {
+            "node": "Processar Resposta IA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Processar Resposta IA": {
+      "main": [
+        [
+          {
+            "node": "Responder Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "ac15e68b-6b40-41fa-8e7d-e90c7de796b3",
+  "meta": {
+    "instanceId": "f531fb252dbf40665fefaa3181beaeea61ace3a35a4d3addc3ce931c6136823a"
+  },
+  "id": "DdhUZxYA72P4AiH4",
+  "tags": []
+}

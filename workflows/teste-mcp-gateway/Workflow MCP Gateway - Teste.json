@@ -1,0 +1,174 @@
+{
+  "name": "🧪 Teste MCP Gateway",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual-trigger",
+      "name": "▶️ Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:3100/mcp/crm/espelho_bancario",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "periodo",
+              "value": "hoje"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "http-request-hoje",
+      "name": "🔍 Teste: Hoje",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [460, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:3100/mcp/crm/espelho_bancario",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "periodo",
+              "value": "esta semana"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "http-request-semana",
+      "name": "🔍 Teste: Esta Semana",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:3100/mcp/crm/espelho_bancario",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "periodo",
+              "value": "novembro"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "http-request-novembro",
+      "name": "🔍 Teste: Novembro",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [460, 400]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://localhost:3100/health",
+        "authentication": "none",
+        "options": {}
+      },
+      "id": "http-request-health",
+      "name": "❤️ Health Check",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [460, 100]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://localhost:3100/mcp/list",
+        "authentication": "none",
+        "options": {}
+      },
+      "id": "http-request-list",
+      "name": "📋 Listar MCPs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [460, 500]
+    }
+  ],
+  "connections": {
+    "▶️ Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "❤️ Health Check",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "🔍 Teste: Hoje",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "🔍 Teste: Esta Semana",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "🔍 Teste: Novembro",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "📋 Listar MCPs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2025-12-16T19:00:00.000Z",
+  "versionId": "1"
+}
