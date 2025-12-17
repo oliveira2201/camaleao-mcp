@@ -14,10 +14,36 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3100;
+const API_KEY = process.env.API_KEY || 'camaleao-mcp-key-2025';
 
 // Middlewares
 app.use(cors());
 app.use(express.json());
+
+// Middleware de autenticação
+const authenticateAPIKey = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  // Rotas públicas (dashboard e health check)
+  if (req.path === '/' || req.path === '/health') {
+    return next();
+  }
+
+  // Verificar API key
+  const apiKey = req.headers['x-api-key'] || req.headers['authorization']?.replace('Bearer ', '');
+
+  if (!apiKey || apiKey !== API_KEY) {
+    return res.status(401).json({
+      success: false,
+      error: 'Unauthorized: API key inválida ou ausente',
+      hint: 'Envie a API key no header "X-API-Key" ou "Authorization: Bearer {key}"',
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  next();
+};
+
+// Aplicar autenticação em todas as rotas
+app.use(authenticateAPIKey);
 
 // Importar MCP Servers disponíveis
 import { GraphQLClient } from '../../mcp-camaleao-crm/src/lib/graphql-client.js';
@@ -190,6 +216,7 @@ app.get('/', (req, res) => {
       <h1>🦎 Camaleão MCP Gateway</h1>
       <p>Gateway HTTP para MCP Servers - Expõe funcionalidades via REST API</p>
       <span class="status">🟢 Online</span>
+      <span class="status" style="background: #f59e0b; margin-left: 10px;">🔒 Autenticado</span>
     </div>
 
     <div class="grid">
@@ -269,10 +296,19 @@ app.get('/', (req, res) => {
     <div class="api-docs">
       <h2>📚 Documentação da API</h2>
 
+      <div style="background: #374151; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #f59e0b;">
+        <h3 style="margin-bottom: 10px; color: #fbbf24;">🔒 Autenticação Necessária</h3>
+        <p style="color: #d1d5db; margin-bottom: 10px;">Todas as rotas (exceto / e /health) requerem API Key.</p>
+        <p style="color: #d1d5db; margin-bottom: 10px;">Envie a API key em um dos headers:</p>
+        <pre style="margin: 0;">X-API-Key: sua-api-key
+ou
+Authorization: Bearer sua-api-key</pre>
+      </div>
+
       <div class="endpoint">
         <span class="method get">GET</span>
         <code>/health</code>
-        <p style="margin-top: 10px; color: #d1d5db;">Verifica se o gateway está online</p>
+        <p style="margin-top: 10px; color: #d1d5db;">Verifica se o gateway está online (público)</p>
       </div>
 
       <div class="endpoint">
