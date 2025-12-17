@@ -48,6 +48,9 @@ app.use(authenticateAPIKey);
 // Importar MCP Servers disponíveis
 import { GraphQLClient } from '../../mcp-camaleao-crm/src/lib/graphql-client.js';
 import { espelhoBancario } from '../../mcp-camaleao-crm/src/tools/espelho-bancario.js';
+import { monitorarPedidosParados } from '../../mcp-camaleao-crm/src/tools/monitorar-pedidos-parados.js';
+import { consultarPedidos } from '../../mcp-camaleao-crm/src/tools/consultar-pedidos.js';
+import { consultarPagamentos } from '../../mcp-camaleao-crm/src/tools/consultar-pagamentos.js';
 
 // Configuração
 const API_URL = process.env.CAMALEAO_API_URL || 'https://web-api.camaleaocamisas.com.br/graphql-api';
@@ -432,6 +435,73 @@ app.post('/mcp/crm/espelho_bancario', async (req, res) => {
     console.log('[GATEWAY] Executando espelho_bancario:', args);
 
     const result = await espelhoBancario(crmClient, args);
+
+    res.json({
+      success: true,
+      data: result,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error: any) {
+    console.error('[GATEWAY] Erro:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
+// Executar tool do CRM: monitorar_pedidos_parados
+app.post('/mcp/crm/monitorar_pedidos_parados', async (req, res) => {
+  try {
+    console.log('[GATEWAY] Executando monitorar_pedidos_parados');
+
+    const result = await monitorarPedidosParados(crmClient);
+
+    res.json({
+      success: true,
+      data: result,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error: any) {
+    console.error('[GATEWAY] Erro:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
+// Executar tool do CRM: consultar_pedidos
+app.post('/mcp/crm/consultar_pedidos', async (req, res) => {
+  try {
+    const args = req.body;
+    console.log('[GATEWAY] Executando consultar_pedidos:', args);
+
+    const result = await consultarPedidos(crmClient, args);
+
+    res.json({
+      success: true,
+      data: result,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error: any) {
+    console.error('[GATEWAY] Erro:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
+// Executar tool do CRM: consultar_pagamentos
+app.post('/mcp/crm/consultar_pagamentos', async (req, res) => {
+  try {
+    console.log('[GATEWAY] Executando consultar_pagamentos');
+
+    const result = await consultarPagamentos(crmClient);
 
     res.json({
       success: true,

@@ -1,0 +1,67 @@
+{
+  "name": "🧪 Teste Gateway Isolado - Ontem",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual-trigger",
+      "name": "▶️ Clique para Testar",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://gestorconecta-mcp-gateway.oxlser.easypanel.host/mcp/crm/espelho_bancario",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"periodo\": \"ontem\"\n}",
+        "options": {}
+      },
+      "id": "http-request",
+      "name": "🌐 Chamar Gateway: Ontem",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CREDENTIAL_ID",
+          "name": "MCP Gateway API Key"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "▶️ Clique para Testar": {
+      "main": [
+        [
+          {
+            "node": "🌐 Chamar Gateway: Ontem",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2025-12-17T11:45:00.000Z",
+  "versionId": "1"
+}

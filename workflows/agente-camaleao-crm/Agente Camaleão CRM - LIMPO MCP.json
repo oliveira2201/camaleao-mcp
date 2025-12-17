@@ -1,0 +1,205 @@
+{
+  "name": "Agente Camaleão CRM - LIMPO MCP ONLY - 17/12 12:00",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "trigger-execute",
+      "name": "▶️ Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "agente-camaleao-crm",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "trigger-webhook",
+      "name": "🎯 Entrada Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 500],
+      "webhookId": "agente-camaleao-crm"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.pergunta ?? $json.body?.pergunta ?? $json.query?.pergunta ?? 'Como posso ajudar com os dados do CRM?' }}",
+        "options": {
+          "systemMessage": "Você é o Agente Camaleão CRM, especialista em dados da Camaleão Camisas.\n\nFERRAMENTA DISPONÍVEL:\n\n**espelho_bancario** - Consulta recebimentos e pagamentos bancários\n\n**Entrada flexível:**\n- Dia único: { \"periodo\": \"hoje\" } ou { \"periodo\": \"ontem\" }\n- Período natural: { \"periodo\": \"novembro\" }, { \"periodo\": \"ultimos 15 dias\" }, { \"periodo\": \"esta semana\" }, { \"periodo\": \"semana passada\" }\n- Período manual: { \"data_inicio\": \"2025-11-01\", \"data_fim\": \"2025-11-30\" }\n\n**Retorna:**\n- Total recebido\n- Total pago\n- Saldo líquido do período\n- Recebimentos detalhados por via de pagamento (PIX, Cora, Mercado Pago, Cartão, Dinheiro, Transferência)\n\nUSO:\nChame a tool diretamente passando o período. SEM LIMITE DE TIMEOUT!\n\nRESPONDA:\n- Clara e objetiva\n- Use R$ para valores brasileiros\n- Quando falar de datas, use formato brasileiro (DD/MM/YYYY)\n- Sempre apresente o saldo líquido (recebimentos - pagamentos)"
+        }
+      },
+      "id": "agent",
+      "name": "🤖 Agente Camaleão",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [460, 400]
+    },
+    {
+      "parameters": {
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "id": "openai-model",
+      "name": "OpenAI Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.1,
+      "position": [680, 280]
+    },
+    {
+      "parameters": {
+        "name": "espelho_bancario",
+        "description": "Consulta recebimentos PIX, cartão, dinheiro e outros meios de pagamento. Aceita 'periodo' (texto natural como 'hoje', 'ontem', 'esta semana', 'novembro') ou 'data_inicio' e 'data_fim' (formato YYYY-MM-DD). Retorna total recebido, total pago, saldo líquido e detalhamento por via de pagamento.",
+        "method": "POST",
+        "url": "https://gestorconecta-mcp-gateway.oxlser.easypanel.host/mcp/crm/espelho_bancario",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "autodetect",
+              "jsonPropertyName": "data"
+            }
+          }
+        }
+      },
+      "id": "tool-gateway",
+      "name": "🌐 MCP Gateway CRM",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [680, 520],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CREDENTIAL_ID",
+          "name": "MCP Gateway API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "response-field",
+              "name": "resposta",
+              "value": "={{ $json.output }}",
+              "type": "string"
+            },
+            {
+              "id": "timestamp-field",
+              "name": "timestamp",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "format-response",
+      "name": "📝 Formatar Resposta",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [680, 400]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "respond-webhook",
+      "name": "📤 Responder Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [900, 400]
+    }
+  ],
+  "connections": {
+    "▶️ Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "🤖 Agente Camaleão",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🎯 Entrada Webhook": {
+      "main": [
+        [
+          {
+            "node": "🤖 Agente Camaleão",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🤖 Agente Camaleão": {
+      "main": [
+        [
+          {
+            "node": "📝 Formatar Resposta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ],
+      "ai_languageModel": [
+        [
+          {
+            "node": "OpenAI Model",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ],
+      "ai_tool": [
+        [
+          {
+            "node": "🌐 MCP Gateway CRM",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📝 Formatar Resposta": {
+      "main": [
+        [
+          {
+            "node": "📤 Responder Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2025-12-17T12:00:00.000Z",
+  "versionId": "1"
+}
